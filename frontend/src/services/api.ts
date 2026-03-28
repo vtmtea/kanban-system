@@ -9,6 +9,7 @@ import type {
   LoginRequest,
   LoginResponse,
   RegisterRequest,
+  UpdateUserRequest,
   CreateBoardRequest,
   UpdateBoardRequest,
   CreateListRequest,
@@ -52,7 +53,7 @@ export const authApi = {
   register: (data: RegisterRequest) => api.post<LoginResponse>('/auth/register', data),
   login: (data: LoginRequest) => api.post<LoginResponse>('/auth/login', data),
   getCurrentUser: () => api.get<User>('/user'),
-  updateUser: (data: { nickname?: string; avatar?: string }) => api.put<User>('/user', data),
+  updateUser: (data: UpdateUserRequest) => api.put<User>('/user', data),
 };
 
 // 看板相关

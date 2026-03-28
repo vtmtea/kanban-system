@@ -309,7 +309,7 @@ export function CardDetailModal({ cardId, boardId, onClose, onDelete }: CardDeta
                         {comment.user?.nickname || comment.user?.username}
                       </span>
                       <span className="text-xs text-gray-400">
-                        {new Date(comment.created_at).toLocaleString('zh-CN')}
+                        {comment.created_at ? new Date(comment.created_at).toLocaleString('zh-CN') : ''}
                       </span>
                     </div>
                     <p className="text-gray-600">{comment.content}</p>

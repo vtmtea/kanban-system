@@ -23,6 +23,9 @@ go.work
 # Air temp directory
 tmp/
 
+# Generated API types
+internal/api/generated.go
+
 # IDE
 .idea/
 .vscode/

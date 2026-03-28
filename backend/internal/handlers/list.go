@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"kanban-system/backend/internal/api"
 	"kanban-system/backend/internal/database"
 	"kanban-system/backend/internal/middleware"
 	"kanban-system/backend/internal/models"
@@ -11,17 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
-
-// CreateListRequest 创建列表请求
-type CreateListRequest struct {
-	Title string `json:"title" binding:"required,max=100"`
-}
-
-// UpdateListRequest 更新列表请求
-type UpdateListRequest struct {
-	Title    string `json:"title" binding:"max=100"`
-	Position int    `json:"position"`
-}
 
 // GetLists 获取看板的列表
 func GetLists(c *gin.Context) {
@@ -39,7 +29,12 @@ func GetLists(c *gin.Context) {
 		}).
 		Find(&lists)
 
-	c.JSON(http.StatusOK, lists)
+	result := make([]api.List, len(lists))
+	for i, list := range lists {
+		result[i] = *listToAPI(list)
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // CreateList 创建列表
@@ -64,7 +59,7 @@ func CreateList(c *gin.Context) {
 		return
 	}
 
-	var req CreateListRequest
+	var req api.CreateListRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -85,7 +80,7 @@ func CreateList(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, list)
+	c.JSON(http.StatusCreated, listToAPI(list))
 }
 
 // UpdateList 更新列表
@@ -110,17 +105,17 @@ func UpdateList(c *gin.Context) {
 		return
 	}
 
-	var req UpdateListRequest
+	var req api.UpdateListRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if req.Title != "" {
-		list.Title = req.Title
+	if req.Title != nil {
+		list.Title = *req.Title
 	}
-	if req.Position >= 0 {
-		list.Position = req.Position
+	if req.Position != nil {
+		list.Position = *req.Position
 	}
 
 	if err := database.DB.Save(&list).Error; err != nil {
@@ -128,7 +123,7 @@ func UpdateList(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, list)
+	c.JSON(http.StatusOK, listToAPI(list))
 }
 
 // DeleteList 删除列表
@@ -158,5 +153,5 @@ func DeleteList(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "List deleted successfully"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "List deleted successfully"})
 }

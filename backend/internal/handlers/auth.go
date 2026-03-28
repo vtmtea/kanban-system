@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"kanban-system/backend/internal/api"
 	"kanban-system/backend/internal/database"
 	"kanban-system/backend/internal/middleware"
 	"kanban-system/backend/internal/models"
@@ -11,29 +12,9 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// RegisterRequest 注册请求
-type RegisterRequest struct {
-	Username string `json:"username" binding:"required,min=3,max=50"`
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6,max=100"`
-	Nickname string `json:"nickname"`
-}
-
-// LoginRequest 登录请求
-type LoginRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
-}
-
-// LoginResponse 登录响应
-type LoginResponse struct {
-	Token string      `json:"token"`
-	User  models.User `json:"user"`
-}
-
 // Register 用户注册
 func Register(c *gin.Context) {
-	var req RegisterRequest
+	var req api.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -61,12 +42,13 @@ func Register(c *gin.Context) {
 
 	user := models.User{
 		Username: req.Username,
-		Email:    req.Email,
+		Email:    string(req.Email),
 		Password: string(hashedPassword),
-		Nickname: req.Nickname,
 	}
 
-	if user.Nickname == "" {
+	if req.Nickname != nil {
+		user.Nickname = *req.Nickname
+	} else {
 		user.Nickname = req.Username
 	}
 
@@ -82,15 +64,15 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, LoginResponse{
+	c.JSON(http.StatusCreated, api.LoginResponse{
 		Token: token,
-		User:  user,
+		User:  *userToAPI(user),
 	})
 }
 
 // Login 用户登录
 func Login(c *gin.Context) {
-	var req LoginRequest
+	var req api.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -115,9 +97,9 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, LoginResponse{
+	c.JSON(http.StatusOK, api.LoginResponse{
 		Token: token,
-		User:  user,
+		User:  *userToAPI(user),
 	})
 }
 
@@ -131,20 +113,14 @@ func GetCurrentUser(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
-}
-
-// UpdateUserRequest 更新用户请求
-type UpdateUserRequest struct {
-	Nickname string `json:"nickname"`
-	Avatar   string `json:"avatar"`
+	c.JSON(http.StatusOK, userToAPI(user))
 }
 
 // UpdateCurrentUser 更新当前用户信息
 func UpdateCurrentUser(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 
-	var req UpdateUserRequest
+	var req api.UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -156,11 +132,11 @@ func UpdateCurrentUser(c *gin.Context) {
 		return
 	}
 
-	if req.Nickname != "" {
-		user.Nickname = req.Nickname
+	if req.Nickname != nil {
+		user.Nickname = *req.Nickname
 	}
-	if req.Avatar != "" {
-		user.Avatar = req.Avatar
+	if req.Avatar != nil {
+		user.Avatar = *req.Avatar
 	}
 
 	if err := database.DB.Save(&user).Error; err != nil {
@@ -168,5 +144,18 @@ func UpdateCurrentUser(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	c.JSON(http.StatusOK, userToAPI(user))
+}
+
+// userToAPI 将 models.User 转换为 api.User
+func userToAPI(user models.User) *api.User {
+	return &api.User{
+		Id:        int(user.ID),
+		Username:  user.Username,
+		Email:     user.Email,
+		Nickname:  &user.Nickname,
+		Avatar:    &user.Avatar,
+		CreatedAt: &user.CreatedAt,
+		UpdatedAt: &user.UpdatedAt,
+	}
 }

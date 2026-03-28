@@ -4,18 +4,13 @@ import (
 	"net/http"
 	"strconv"
 
+	"kanban-system/backend/internal/api"
 	"kanban-system/backend/internal/database"
 	"kanban-system/backend/internal/middleware"
 	"kanban-system/backend/internal/models"
 
 	"github.com/gin-gonic/gin"
 )
-
-// CreateLabelRequest 创建标签请求
-type CreateLabelRequest struct {
-	Name  string `json:"name" binding:"required,max=50"`
-	Color string `json:"color" binding:"required,max=7"`
-}
 
 // GetLabels 获取看板的标签
 func GetLabels(c *gin.Context) {
@@ -28,7 +23,12 @@ func GetLabels(c *gin.Context) {
 	var labels []models.Label
 	database.DB.Where("board_id = ?", boardID).Find(&labels)
 
-	c.JSON(http.StatusOK, labels)
+	result := make([]api.Label, len(labels))
+	for i, label := range labels {
+		result[i] = *labelToAPI(label)
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // CreateLabel 创建标签
@@ -47,7 +47,7 @@ func CreateLabel(c *gin.Context) {
 		return
 	}
 
-	var req CreateLabelRequest
+	var req api.CreateLabelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -64,7 +64,7 @@ func CreateLabel(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, label)
+	c.JSON(http.StatusCreated, labelToAPI(label))
 }
 
 // DeleteLabel 删除标签
@@ -94,5 +94,5 @@ func DeleteLabel(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Label deleted successfully"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "Label deleted successfully"})
 }

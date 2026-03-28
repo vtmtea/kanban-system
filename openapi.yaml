@@ -1,0 +1,1052 @@
+openapi: 3.0.3
+info:
+  title: Kanban System API
+  description: 看板工作流管理系统 API
+  version: 1.0.0
+
+servers:
+  - url: /api
+    description: API Server
+
+tags:
+  - name: auth
+    description: 认证相关接口
+  - name: user
+    description: 用户相关接口
+  - name: board
+    description: 看板相关接口
+  - name: list
+    description: 列表相关接口
+  - name: card
+    description: 卡片相关接口
+  - name: comment
+    description: 评论相关接口
+  - name: label
+    description: 标签相关接口
+
+paths:
+  # 认证接口
+  /auth/register:
+    post:
+      tags:
+        - auth
+      summary: 用户注册
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      tags:
+        - auth
+      summary: 用户登录
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: 用户名或密码错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # 用户接口
+  /user:
+    get:
+      tags:
+        - user
+      summary: 获取当前用户信息
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: 未授权
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags:
+        - user
+      summary: 更新用户信息
+      operationId: updateUser
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: 未授权
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # 看板接口
+  /boards:
+    get:
+      tags:
+        - board
+      summary: 获取看板列表
+      operationId: getBoards
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Board'
+    post:
+      tags:
+        - board
+      summary: 创建看板
+      operationId: createBoard
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBoardRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Board'
+
+  /boards/{id}:
+    get:
+      tags:
+        - board
+      summary: 获取看板详情
+      operationId: getBoard
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Board'
+        '404':
+          description: 看板不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags:
+        - board
+      summary: 更新看板
+      operationId: updateBoard
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBoardRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Board'
+    delete:
+      tags:
+        - board
+      summary: 删除看板
+      operationId: deleteBoard
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+  # 列表接口
+  /boards/{id}/lists:
+    get:
+      tags:
+        - list
+      summary: 获取看板的列表
+      operationId: getLists
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/List'
+    post:
+      tags:
+        - list
+      summary: 创建列表
+      operationId: createList
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateListRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/List'
+
+  /lists/{id}:
+    put:
+      tags:
+        - list
+      summary: 更新列表
+      operationId: updateList
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateListRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/List'
+    delete:
+      tags:
+        - list
+      summary: 删除列表
+      operationId: deleteList
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+  # 卡片接口
+  /lists/{id}/cards:
+    post:
+      tags:
+        - card
+      summary: 创建卡片
+      operationId: createCard
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCardRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Card'
+
+  /cards/{id}:
+    get:
+      tags:
+        - card
+      summary: 获取卡片详情
+      operationId: getCard
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Card'
+    put:
+      tags:
+        - card
+      summary: 更新卡片
+      operationId: updateCard
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCardRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Card'
+    delete:
+      tags:
+        - card
+      summary: 删除卡片
+      operationId: deleteCard
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+  /cards/{id}/move:
+    put:
+      tags:
+        - card
+      summary: 移动卡片
+      operationId: moveCard
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoveCardRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Card'
+
+  /cards/{id}/labels/{label_id}:
+    post:
+      tags:
+        - card
+      summary: 添加标签到卡片
+      operationId: addLabelToCard
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: label_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+    delete:
+      tags:
+        - card
+      summary: 从卡片移除标签
+      operationId: removeLabelFromCard
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: label_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+  # 评论接口
+  /cards/{id}/comments:
+    get:
+      tags:
+        - comment
+      summary: 获取卡片的评论
+      operationId: getComments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Comment'
+    post:
+      tags:
+        - comment
+      summary: 创建评论
+      operationId: createComment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCommentRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+
+  /comments/{id}:
+    delete:
+      tags:
+        - comment
+      summary: 删除评论
+      operationId: deleteComment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+  # 标签接口
+  /boards/{id}/labels:
+    get:
+      tags:
+        - label
+      summary: 获取看板的标签
+      operationId: getLabels
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Label'
+    post:
+      tags:
+        - label
+      summary: 创建标签
+      operationId: createLabel
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLabelRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Label'
+
+  /labels/{id}:
+    delete:
+      tags:
+        - label
+      summary: 删除标签
+      operationId: deleteLabel
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # 基础类型
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        nickname:
+          type: string
+        avatar:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - username
+        - email
+
+    Board:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        owner_id:
+          type: integer
+        owner:
+          $ref: '#/components/schemas/User'
+        color:
+          type: string
+        is_public:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        lists:
+          type: array
+          items:
+            $ref: '#/components/schemas/List'
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/BoardMember'
+      required:
+        - id
+        - title
+        - owner_id
+
+    List:
+      type: object
+      properties:
+        id:
+          type: integer
+        board_id:
+          type: integer
+        title:
+          type: string
+        position:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/Card'
+      required:
+        - id
+        - board_id
+        - title
+        - position
+
+    Card:
+      type: object
+      properties:
+        id:
+          type: integer
+        list_id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        position:
+          type: integer
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+        cover:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/Label'
+        comments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+      required:
+        - id
+        - list_id
+        - title
+        - position
+
+    Label:
+      type: object
+      properties:
+        id:
+          type: integer
+        board_id:
+          type: integer
+        name:
+          type: string
+        color:
+          type: string
+      required:
+        - id
+        - board_id
+        - name
+        - color
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+        card_id:
+          type: integer
+        user_id:
+          type: integer
+        user:
+          $ref: '#/components/schemas/User'
+        content:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - card_id
+        - user_id
+        - content
+
+    BoardMember:
+      type: object
+      properties:
+        id:
+          type: integer
+        board_id:
+          type: integer
+        user_id:
+          type: integer
+        user:
+          $ref: '#/components/schemas/User'
+        role:
+          type: string
+          enum:
+            - owner
+            - admin
+            - member
+        joined_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - board_id
+        - user_id
+        - role
+
+    # 请求类型
+    RegisterRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+          maxLength: 100
+        nickname:
+          type: string
+      required:
+        - username
+        - email
+        - password
+
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required:
+        - username
+        - password
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+        - token
+        - user
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        nickname:
+          type: string
+        avatar:
+          type: string
+
+    CreateBoardRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        color:
+          type: string
+          maxLength: 7
+        is_public:
+          type: boolean
+      required:
+        - title
+
+    UpdateBoardRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        color:
+          type: string
+          maxLength: 7
+        is_public:
+          type: boolean
+
+    CreateListRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 100
+      required:
+        - title
+
+    UpdateListRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 100
+        position:
+          type: integer
+
+    CreateCardRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+        cover:
+          type: string
+      required:
+        - title
+
+    UpdateCardRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+        position:
+          type: integer
+        list_id:
+          type: integer
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+        cover:
+          type: string
+
+    MoveCardRequest:
+      type: object
+      properties:
+        list_id:
+          type: integer
+        position:
+          type: integer
+      required:
+        - list_id
+
+    CreateCommentRequest:
+      type: object
+      properties:
+        content:
+          type: string
+      required:
+        - content
+
+    CreateLabelRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 50
+        color:
+          type: string
+          maxLength: 7
+      required:
+        - name
+        - color
+
+    # 响应类型
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message

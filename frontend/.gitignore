@@ -3,6 +3,9 @@ dist
 dist-ssr
 *.local
 
+# Generated API types
+src/types/api.ts
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

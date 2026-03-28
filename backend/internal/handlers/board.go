@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"kanban-system/backend/internal/api"
 	"kanban-system/backend/internal/database"
 	"kanban-system/backend/internal/middleware"
 	"kanban-system/backend/internal/models"
@@ -11,22 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
-
-// CreateBoardRequest 创建看板请求
-type CreateBoardRequest struct {
-	Title       string `json:"title" binding:"required,max=100"`
-	Description string `json:"description" binding:"max=500"`
-	Color       string `json:"color" binding:"max=7"`
-	IsPublic    bool   `json:"is_public"`
-}
-
-// UpdateBoardRequest 更新看板请求
-type UpdateBoardRequest struct {
-	Title       string `json:"title" binding:"max=100"`
-	Description string `json:"description" binding:"max=500"`
-	Color       string `json:"color" binding:"max=7"`
-	IsPublic    bool   `json:"is_public"`
-}
 
 // GetBoards 获取用户的所有看板
 func GetBoards(c *gin.Context) {
@@ -38,7 +23,12 @@ func GetBoards(c *gin.Context) {
 		Order("created_at DESC").
 		Find(&boards)
 
-	c.JSON(http.StatusOK, boards)
+	result := make([]api.Board, len(boards))
+	for i, board := range boards {
+		result[i] = *boardToAPI(board)
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // GetBoard 获取单个看板详情
@@ -64,14 +54,14 @@ func GetBoard(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, board)
+	c.JSON(http.StatusOK, boardToAPI(board))
 }
 
 // CreateBoard 创建看板
 func CreateBoard(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 
-	var req CreateBoardRequest
+	var req api.CreateBoardRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -79,10 +69,17 @@ func CreateBoard(c *gin.Context) {
 
 	board := models.Board{
 		Title:       req.Title,
-		Description: req.Description,
 		OwnerID:     userID,
-		Color:       req.Color,
-		IsPublic:    req.IsPublic,
+	}
+
+	if req.Description != nil {
+		board.Description = *req.Description
+	}
+	if req.Color != nil {
+		board.Color = *req.Color
+	}
+	if req.IsPublic != nil {
+		board.IsPublic = *req.IsPublic
 	}
 
 	if err := database.DB.Create(&board).Error; err != nil {
@@ -109,7 +106,7 @@ func CreateBoard(c *gin.Context) {
 	}
 	database.DB.Create(&member)
 
-	c.JSON(http.StatusCreated, board)
+	c.JSON(http.StatusCreated, boardToAPI(board))
 }
 
 // UpdateBoard 更新看板
@@ -136,27 +133,31 @@ func UpdateBoard(c *gin.Context) {
 		}
 	}
 
-	var req UpdateBoardRequest
+	var req api.UpdateBoardRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if req.Title != "" {
-		board.Title = req.Title
+	if req.Title != nil {
+		board.Title = *req.Title
 	}
-	if req.Description != "" {
-		board.Description = req.Description
+	if req.Description != nil {
+		board.Description = *req.Description
 	}
-	board.Color = req.Color
-	board.IsPublic = req.IsPublic
+	if req.Color != nil {
+		board.Color = *req.Color
+	}
+	if req.IsPublic != nil {
+		board.IsPublic = *req.IsPublic
+	}
 
 	if err := database.DB.Save(&board).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update board"})
 		return
 	}
 
-	c.JSON(http.StatusOK, board)
+	c.JSON(http.StatusOK, boardToAPI(board))
 }
 
 // DeleteBoard 删除看板
@@ -185,5 +186,5 @@ func DeleteBoard(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Board deleted successfully"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "Board deleted successfully"})
 }

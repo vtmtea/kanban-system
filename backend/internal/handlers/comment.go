@@ -4,17 +4,13 @@ import (
 	"net/http"
 	"strconv"
 
+	"kanban-system/backend/internal/api"
 	"kanban-system/backend/internal/database"
 	"kanban-system/backend/internal/middleware"
 	"kanban-system/backend/internal/models"
 
 	"github.com/gin-gonic/gin"
 )
-
-// CreateCommentRequest 创建评论请求
-type CreateCommentRequest struct {
-	Content string `json:"content" binding:"required"`
-}
 
 // CreateComment 创建评论
 func CreateComment(c *gin.Context) {
@@ -41,7 +37,7 @@ func CreateComment(c *gin.Context) {
 		return
 	}
 
-	var req CreateCommentRequest
+	var req api.CreateCommentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -61,7 +57,7 @@ func CreateComment(c *gin.Context) {
 	// 加载用户信息
 	database.DB.Preload("User").First(&comment, comment.ID)
 
-	c.JSON(http.StatusCreated, comment)
+	c.JSON(http.StatusCreated, commentToAPI(comment))
 }
 
 // GetComments 获取卡片的评论
@@ -78,7 +74,12 @@ func GetComments(c *gin.Context) {
 		Order("created_at DESC").
 		Find(&comments)
 
-	c.JSON(http.StatusOK, comments)
+	result := make([]api.Comment, len(comments))
+	for i, comment := range comments {
+		result[i] = *commentToAPI(comment)
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // DeleteComment 删除评论
@@ -107,5 +108,5 @@ func DeleteComment(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Comment deleted successfully"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "Comment deleted successfully"})
 }

@@ -3,38 +3,14 @@ package handlers
 import (
 	"net/http"
 	"strconv"
-	"time"
 
+	"kanban-system/backend/internal/api"
 	"kanban-system/backend/internal/database"
 	"kanban-system/backend/internal/middleware"
 	"kanban-system/backend/internal/models"
 
 	"github.com/gin-gonic/gin"
 )
-
-// CreateCardRequest 创建卡片请求
-type CreateCardRequest struct {
-	Title       string     `json:"title" binding:"required,max=200"`
-	Description string     `json:"description"`
-	DueDate     *time.Time `json:"due_date"`
-	Cover       string     `json:"cover"`
-}
-
-// UpdateCardRequest 更新卡片请求
-type UpdateCardRequest struct {
-	Title       string     `json:"title" binding:"max=200"`
-	Description string     `json:"description"`
-	Position    int        `json:"position"`
-	ListID      uint       `json:"list_id"`
-	DueDate     *time.Time `json:"due_date"`
-	Cover       string     `json:"cover"`
-}
-
-// MoveCardRequest 移动卡片请求
-type MoveCardRequest struct {
-	ListID   uint `json:"list_id" binding:"required"`
-	Position int  `json:"position"`
-}
 
 // GetCard 获取卡片详情
 func GetCard(c *gin.Context) {
@@ -54,7 +30,7 @@ func GetCard(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, card)
+	c.JSON(http.StatusOK, cardToAPI(card))
 }
 
 // CreateCard 创建卡片
@@ -79,7 +55,7 @@ func CreateCard(c *gin.Context) {
 		return
 	}
 
-	var req CreateCardRequest
+	var req api.CreateCardRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -90,12 +66,19 @@ func CreateCard(c *gin.Context) {
 	database.DB.Model(&models.Card{}).Where("list_id = ?", listID).Select("COALESCE(MAX(position), -1)").Scan(&maxPosition)
 
 	card := models.Card{
-		ListID:      uint(listID),
-		Title:       req.Title,
-		Description: req.Description,
-		Position:    maxPosition + 1,
-		DueDate:     req.DueDate,
-		Cover:       req.Cover,
+		ListID:   uint(listID),
+		Title:    req.Title,
+		Position: maxPosition + 1,
+	}
+
+	if req.Description != nil {
+		card.Description = *req.Description
+	}
+	if req.DueDate != nil {
+		card.DueDate = req.DueDate
+	}
+	if req.Cover != nil {
+		card.Cover = *req.Cover
 	}
 
 	if err := database.DB.Create(&card).Error; err != nil {
@@ -103,7 +86,7 @@ func CreateCard(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, card)
+	c.JSON(http.StatusCreated, cardToAPI(card))
 }
 
 // UpdateCard 更新卡片
@@ -131,27 +114,27 @@ func UpdateCard(c *gin.Context) {
 		return
 	}
 
-	var req UpdateCardRequest
+	var req api.UpdateCardRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if req.Title != "" {
-		card.Title = req.Title
+	if req.Title != nil {
+		card.Title = *req.Title
 	}
-	if req.Description != "" {
-		card.Description = req.Description
+	if req.Description != nil {
+		card.Description = *req.Description
 	}
-	if req.Position >= 0 {
-		card.Position = req.Position
+	if req.Position != nil {
+		card.Position = *req.Position
 	}
-	if req.ListID > 0 {
-		card.ListID = req.ListID
+	if req.ListId != nil && *req.ListId > 0 {
+		card.ListID = uint(*req.ListId)
 	}
 	card.DueDate = req.DueDate
-	if req.Cover != "" {
-		card.Cover = req.Cover
+	if req.Cover != nil {
+		card.Cover = *req.Cover
 	}
 
 	if err := database.DB.Save(&card).Error; err != nil {
@@ -159,7 +142,7 @@ func UpdateCard(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, card)
+	c.JSON(http.StatusOK, cardToAPI(card))
 }
 
 // MoveCard 移动卡片到其他列表
@@ -177,7 +160,7 @@ func MoveCard(c *gin.Context) {
 		return
 	}
 
-	var req MoveCardRequest
+	var req api.MoveCardRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -185,7 +168,7 @@ func MoveCard(c *gin.Context) {
 
 	// 检查目标列表权限
 	var targetList models.List
-	if err := database.DB.First(&targetList, req.ListID).Error; err != nil {
+	if err := database.DB.First(&targetList, req.ListId).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Target list not found"})
 		return
 	}
@@ -196,9 +179,9 @@ func MoveCard(c *gin.Context) {
 		return
 	}
 
-	card.ListID = req.ListID
-	if req.Position >= 0 {
-		card.Position = req.Position
+	card.ListID = uint(req.ListId)
+	if req.Position != nil {
+		card.Position = *req.Position
 	}
 
 	if err := database.DB.Save(&card).Error; err != nil {
@@ -206,7 +189,7 @@ func MoveCard(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, card)
+	c.JSON(http.StatusOK, cardToAPI(card))
 }
 
 // DeleteCard 删除卡片
@@ -239,7 +222,7 @@ func DeleteCard(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Card deleted successfully"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "Card deleted successfully"})
 }
 
 // AddLabelToCard 添加标签到卡片
@@ -281,7 +264,7 @@ func AddLabelToCard(c *gin.Context) {
 
 	database.DB.Model(&card).Association("Labels").Append(&label)
 
-	c.JSON(http.StatusOK, gin.H{"message": "Label added successfully"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "Label added successfully"})
 }
 
 // RemoveLabelFromCard 从卡片移除标签
@@ -323,5 +306,5 @@ func RemoveLabelFromCard(c *gin.Context) {
 
 	database.DB.Model(&card).Association("Labels").Delete(&label)
 
-	c.JSON(http.StatusOK, gin.H{"message": "Label removed successfully"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "Label removed successfully"})
 }
