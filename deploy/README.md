@@ -24,6 +24,7 @@
 | `SERVER_PORT` | SSH 端口（可选） | `22`（默认） |
 | `DEPLOY_PATH` | 后端部署路径（可选） | `/opt/kanban`（默认） |
 | `FRONTEND_DEPLOY_PATH` | 前端部署路径（可选） | `/var/www/kanban`（默认） |
+| `VITE_API_BASE_URL` | 前端 API 基础路径（可选） | `/api`（默认，Nginx 代理）或 `https://api.example.com/api` |
 
 ### 生成 SSH 密钥
 

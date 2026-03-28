@@ -97,8 +97,8 @@ jobs:
             chmod +x ${{ secrets.DEPLOY_PATH || '/opt/kanban' }}/backend/kanban-backend
 
             # Try to restart the service (if systemd service exists)
-            if systemctl is-active --quiet kanban-backend; then
-              sudo systemctl restart kanban-backend
+            if systemctl is-active --quiet kanban-api; then
+              sudo systemctl restart kanban-api
               echo "Service restarted via systemctl"
             else
               echo "No systemd service found. Please restart manually or create a service."

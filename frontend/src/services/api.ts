@@ -21,8 +21,13 @@ import type {
   CreateLabelRequest,
 } from '@/types';
 
+// 动态获取 API 基础路径
+// 开发环境: /api (由 Vite 代理转发)
+// 生产环境: 由环境变量 VITE_API_BASE_URL 配置
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
   timeout: 10000,
 });
 
