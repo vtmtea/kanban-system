@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { boardApi, listApi, cardApi } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 import { CardDetailModal } from '@/components/CardDetailModal';
+import { useWebSocket } from '@/hooks/useWebSocket';
 import type { List, Card } from '@/types';
 
 export function BoardDetailPage() {
@@ -17,6 +18,12 @@ export function BoardDetailPage() {
   const { data: board, isLoading } = useQuery({
     queryKey: ['board', boardId],
     queryFn: () => boardApi.getOne(boardId),
+  });
+
+  // WebSocket 实时同步
+  useWebSocket({
+    boardId,
+    enabled: !isLoading && !!board?.data,
   });
 
   const [newListTitle, setNewListTitle] = useState('');

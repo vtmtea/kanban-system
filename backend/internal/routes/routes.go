@@ -127,6 +127,12 @@ func SetupRoutes(r *gin.Engine) {
 			protected.GET("/boards/:id/analytics/cfd", handlers.GetCFD)
 			protected.GET("/boards/:id/analytics/cycle-time", handlers.GetCycleTime)
 			protected.GET("/boards/:id/analytics/throughput", handlers.GetThroughput)
+
+			// WebSocket 在线用户
+			protected.GET("/boards/:id/online-users", handlers.GetBoardOnlineUsers)
 		}
+
+		// WebSocket 连接（需要 token 查询参数）
+		api.GET("/ws/boards/:id", handlers.HandleWebSocket)
 	}
 }

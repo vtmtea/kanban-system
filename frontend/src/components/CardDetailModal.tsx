@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cardApi, commentApi, labelApi } from '@/services/api';
+import { MarkdownEditor, MarkdownRenderer } from '@/components/MarkdownEditor';
 import type { Card, Comment, Label } from '@/types';
 
 interface CardDetailModalProps {
@@ -229,13 +230,10 @@ export function CardDetailModal({ cardId, boardId, onClose, onDelete }: CardDeta
             <h3 className="text-sm font-medium text-gray-500 mb-2">描述</h3>
             {isEditingDesc ? (
               <div>
-                <textarea
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
-                  rows={4}
+                <MarkdownEditor
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="添加详细描述..."
-                  autoFocus
+                  onChange={setDescription}
+                  placeholder="支持 Markdown 格式..."
                 />
                 <div className="flex gap-2 mt-2">
                   <button
@@ -260,7 +258,9 @@ export function CardDetailModal({ cardId, boardId, onClose, onDelete }: CardDeta
                   setIsEditingDesc(true);
                 }}
               >
-                {card.description || (
+                {card.description ? (
+                  <MarkdownRenderer content={card.description} />
+                ) : (
                   <span className="text-gray-400">点击添加描述...</span>
                 )}
               </div>

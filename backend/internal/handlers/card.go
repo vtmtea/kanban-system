@@ -119,6 +119,9 @@ func CreateCard(c *gin.Context) {
 	// 记录活动
 	logActivity(uint(listID), userID, "created", "card", card.ID, "Created card: "+card.Title)
 
+	// WebSocket 广播
+	BroadcastToBoard(list.BoardID, "created", "card", card.ID, cardToAPI(card), userID)
+
 	c.JSON(http.StatusCreated, cardToAPI(card))
 }
 
@@ -185,6 +188,10 @@ func UpdateCard(c *gin.Context) {
 
 	// 记录活动
 	logActivity(card.ListID, userID, "updated", "card", card.ID, "Updated card: "+card.Title)
+
+	// WebSocket 广播
+	database.DB.First(&list, card.ListID)
+	BroadcastToBoard(list.BoardID, "updated", "card", card.ID, cardToAPI(card), userID)
 
 	c.JSON(http.StatusOK, cardToAPI(card))
 }
@@ -277,6 +284,9 @@ func MoveCard(c *gin.Context) {
 	database.DB.First(&oldList, oldListID)
 	logActivity(uint(req.ListId), userID, "moved", "card", card.ID, "Moved card from "+oldList.Title+" to "+targetList.Title)
 
+	// WebSocket 广播
+	BroadcastToBoard(targetList.BoardID, "moved", "card", card.ID, cardToAPI(card), userID)
+
 	c.JSON(http.StatusOK, cardToAPI(card))
 }
 
@@ -311,6 +321,11 @@ func CompleteCard(c *gin.Context) {
 
 	// 记录活动
 	logActivity(card.ListID, userID, "completed", "card", card.ID, "Completed card: "+card.Title)
+
+	// WebSocket 广播
+	var list models.List
+	database.DB.First(&list, card.ListID)
+	BroadcastToBoard(list.BoardID, "completed", "card", card.ID, cardToAPI(card), userID)
 
 	c.JSON(http.StatusOK, cardToAPI(card))
 }
@@ -366,6 +381,11 @@ func AssignCard(c *gin.Context) {
 
 	database.DB.Preload("Assignee").First(&card, card.ID)
 
+	// WebSocket 广播
+	var list models.List
+	database.DB.First(&list, card.ListID)
+	BroadcastToBoard(list.BoardID, "assigned", "card", card.ID, cardToAPI(card), userID)
+
 	c.JSON(http.StatusOK, cardToAPI(card))
 }
 
@@ -396,6 +416,9 @@ func DeleteCard(c *gin.Context) {
 
 	// 记录活动
 	logActivity(card.ListID, userID, "deleted", "card", card.ID, "Deleted card: "+card.Title)
+
+	// WebSocket 广播
+	BroadcastToBoard(list.BoardID, "deleted", "card", card.ID, map[string]uint{"card_id": card.ID}, userID)
 
 	if err := database.DB.Delete(&card).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete card"})
