@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Kanban System API
   description: 看板工作流管理系统 API
-  version: 1.0.0
+  version: 2.0.0
 
 servers:
   - url: /api
@@ -15,14 +15,28 @@ tags:
     description: 用户相关接口
   - name: board
     description: 看板相关接口
+  - name: swimlane
+    description: 泳道相关接口
   - name: list
     description: 列表相关接口
   - name: card
     description: 卡片相关接口
+  - name: checklist
+    description: 检查清单相关接口
   - name: comment
     description: 评论相关接口
   - name: label
     description: 标签相关接口
+  - name: attachment
+    description: 附件相关接口
+  - name: member
+    description: 成员相关接口
+  - name: activity
+    description: 活动日志相关接口
+  - name: webhook
+    description: Webhook相关接口
+  - name: analytics
+    description: 数据分析相关接口
 
 paths:
   # 认证接口
@@ -240,6 +254,129 @@ paths:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
 
+  /boards/{id}/wip-status:
+    get:
+      tags:
+        - board
+      summary: 获取看板WIP状态
+      operationId: getBoardWipStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ListWipStatus'
+
+  # 泳道接口
+  /boards/{id}/swimlanes:
+    get:
+      tags:
+        - swimlane
+      summary: 获取看板的泳道
+      operationId: getSwimlanes
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Swimlane'
+    post:
+      tags:
+        - swimlane
+      summary: 创建泳道
+      operationId: createSwimlane
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSwimlaneRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Swimlane'
+
+  /swimlanes/{id}:
+    put:
+      tags:
+        - swimlane
+      summary: 更新泳道
+      operationId: updateSwimlane
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSwimlaneRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Swimlane'
+    delete:
+      tags:
+        - swimlane
+      summary: 删除泳道
+      operationId: deleteSwimlane
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
   # 列表接口
   /boards/{id}/lists:
     get:
@@ -323,6 +460,150 @@ paths:
         - list
       summary: 删除列表
       operationId: deleteList
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+  # 列自动指派接口
+  /lists/{id}/auto-assignments:
+    get:
+      tags:
+        - list
+      summary: 获取列的自动指派配置
+      operationId: getAutoAssignments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ListAutoAssignment'
+    post:
+      tags:
+        - list
+      summary: 设置列的自动指派
+      operationId: setAutoAssignment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetAutoAssignmentRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListAutoAssignment'
+    delete:
+      tags:
+        - list
+      summary: 删除列的自动指派
+      operationId: deleteAutoAssignment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+  # 状态转移规则接口
+  /boards/{id}/transition-rules:
+    get:
+      tags:
+        - list
+      summary: 获取看板的状态转移规则
+      operationId: getTransitionRules
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ListTransitionRule'
+    post:
+      tags:
+        - list
+      summary: 创建状态转移规则
+      operationId: createTransitionRule
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTransitionRuleRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListTransitionRule'
+
+  /transition-rules/{id}:
+    delete:
+      tags:
+        - list
+      summary: 删除状态转移规则
+      operationId: deleteTransitionRule
       security:
         - bearerAuth: []
       parameters:
@@ -464,6 +745,56 @@ paths:
               schema:
                 $ref: '#/components/schemas/Card'
 
+  /cards/{id}/complete:
+    put:
+      tags:
+        - card
+      summary: 完成卡片
+      operationId: completeCard
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Card'
+
+  /cards/{id}/assign:
+    put:
+      tags:
+        - card
+      summary: 指派卡片
+      operationId: assignCard
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignCardRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Card'
+
   /cards/{id}/labels/{label_id}:
     post:
       tags:
@@ -504,6 +835,105 @@ paths:
           schema:
             type: integer
         - name: label_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+  # 检查清单接口
+  /cards/{id}/checklist:
+    get:
+      tags:
+        - checklist
+      summary: 获取卡片的检查清单
+      operationId: getChecklist
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChecklistItem'
+    post:
+      tags:
+        - checklist
+      summary: 创建检查清单项
+      operationId: createChecklistItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChecklistItemRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChecklistItem'
+
+  /checklist/{id}:
+    put:
+      tags:
+        - checklist
+      summary: 更新检查清单项
+      operationId: updateChecklistItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateChecklistItemRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChecklistItem'
+    delete:
+      tags:
+        - checklist
+      summary: 删除检查清单项
+      operationId: deleteChecklistItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
           in: path
           required: true
           schema:
@@ -568,6 +998,32 @@ paths:
                 $ref: '#/components/schemas/Comment'
 
   /comments/{id}:
+    put:
+      tags:
+        - comment
+      summary: 更新评论
+      operationId: updateComment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCommentRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
     delete:
       tags:
         - comment
@@ -641,6 +1097,32 @@ paths:
                 $ref: '#/components/schemas/Label'
 
   /labels/{id}:
+    put:
+      tags:
+        - label
+      summary: 更新标签
+      operationId: updateLabel
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLabelRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Label'
     delete:
       tags:
         - label
@@ -662,6 +1144,431 @@ paths:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
 
+  # 附件接口
+  /cards/{id}/attachments:
+    get:
+      tags:
+        - attachment
+      summary: 获取卡片的附件
+      operationId: getAttachments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Attachment'
+    post:
+      tags:
+        - attachment
+      summary: 上传附件
+      operationId: uploadAttachment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+                - file
+      responses:
+        '201':
+          description: 上传成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attachment'
+
+  /attachments/{id}:
+    delete:
+      tags:
+        - attachment
+      summary: 删除附件
+      operationId: deleteAttachment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+  # 成员接口
+  /boards/{id}/members:
+    get:
+      tags:
+        - member
+      summary: 获取看板成员
+      operationId: getBoardMembers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BoardMember'
+    post:
+      tags:
+        - member
+      summary: 添加看板成员
+      operationId: addBoardMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddBoardMemberRequest'
+      responses:
+        '201':
+          description: 添加成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoardMember'
+
+  /boards/{id}/members/{user_id}:
+    put:
+      tags:
+        - member
+      summary: 更新成员角色
+      operationId: updateBoardMemberRole
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMemberRoleRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoardMember'
+    delete:
+      tags:
+        - member
+      summary: 移除看板成员
+      operationId: removeBoardMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+  # 活动日志接口
+  /boards/{id}/activities:
+    get:
+      tags:
+        - activity
+      summary: 获取看板活动日志
+      operationId: getBoardActivities
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: entity_type
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityListResponse'
+
+  # Webhook接口
+  /boards/{id}/webhooks:
+    get:
+      tags:
+        - webhook
+      summary: 获取看板的Webhook配置
+      operationId: getWebhooks
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Webhook'
+    post:
+      tags:
+        - webhook
+      summary: 创建Webhook
+      operationId: createWebhook
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWebhookRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+
+  /webhooks/{id}:
+    put:
+      tags:
+        - webhook
+      summary: 更新Webhook
+      operationId: updateWebhook
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWebhookRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+    delete:
+      tags:
+        - webhook
+      summary: 删除Webhook
+      operationId: deleteWebhook
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+  # 数据分析接口
+  /boards/{id}/analytics/cfd:
+    get:
+      tags:
+        - analytics
+      summary: 获取累积流图数据
+      operationId: getCFD
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CFDResponse'
+
+  /boards/{id}/analytics/cycle-time:
+    get:
+      tags:
+        - analytics
+      summary: 获取周期时间统计
+      operationId: getCycleTime
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CycleTimeResponse'
+
+  /boards/{id}/analytics/throughput:
+    get:
+      tags:
+        - analytics
+      summary: 获取吞吐率统计
+      operationId: getThroughput
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThroughputResponse'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -680,6 +1587,7 @@ components:
           type: string
         email:
           type: string
+          format: email
         nickname:
           type: string
         avatar:
@@ -722,14 +1630,47 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/List'
+        swimlanes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Swimlane'
         members:
           type: array
           items:
             $ref: '#/components/schemas/BoardMember'
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/Label'
       required:
         - id
         - title
         - owner_id
+
+    Swimlane:
+      type: object
+      properties:
+        id:
+          type: integer
+        board_id:
+          type: integer
+        name:
+          type: string
+        position:
+          type: integer
+        color:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - board_id
+        - name
+        - position
 
     List:
       type: object
@@ -742,6 +1683,9 @@ components:
           type: string
         position:
           type: integer
+        wip_limit:
+          type: integer
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -758,6 +1702,26 @@ components:
         - title
         - position
 
+    ListWipStatus:
+      type: object
+      properties:
+        list_id:
+          type: integer
+        list_title:
+          type: string
+        wip_limit:
+          type: integer
+          nullable: true
+        current_count:
+          type: integer
+        is_over_limit:
+          type: boolean
+      required:
+        - list_id
+        - list_title
+        - current_count
+        - is_over_limit
+
     Card:
       type: object
       properties:
@@ -765,6 +1729,9 @@ components:
           type: integer
         list_id:
           type: integer
+        swimlane_id:
+          type: integer
+          nullable: true
         title:
           type: string
         description:
@@ -777,6 +1744,15 @@ components:
           nullable: true
         cover:
           type: string
+        assignee_id:
+          type: integer
+          nullable: true
+        assignee:
+          $ref: '#/components/schemas/User'
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -791,10 +1767,51 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Comment'
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attachment'
+        checklist_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChecklistItem'
+        checklist_progress:
+          type: object
+          properties:
+            total:
+              type: integer
+            completed:
+              type: integer
       required:
         - id
         - list_id
         - title
+        - position
+
+    ChecklistItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        card_id:
+          type: integer
+        content:
+          type: string
+        completed:
+          type: boolean
+        position:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - card_id
+        - content
+        - completed
         - position
 
     Label:
@@ -808,6 +1825,12 @@ components:
           type: string
         color:
           type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
       required:
         - id
         - board_id
@@ -839,6 +1862,30 @@ components:
         - user_id
         - content
 
+    Attachment:
+      type: object
+      properties:
+        id:
+          type: integer
+        card_id:
+          type: integer
+        file_name:
+          type: string
+        file_url:
+          type: string
+        file_size:
+          type: integer
+        mime_type:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - card_id
+        - file_name
+        - file_url
+
     BoardMember:
       type: object
       properties:
@@ -856,6 +1903,7 @@ components:
             - owner
             - admin
             - member
+            - observer
         joined_at:
           type: string
           format: date-time
@@ -864,6 +1912,212 @@ components:
         - board_id
         - user_id
         - role
+
+    Activity:
+      type: object
+      properties:
+        id:
+          type: integer
+        board_id:
+          type: integer
+        user_id:
+          type: integer
+        user:
+          $ref: '#/components/schemas/User'
+        action:
+          type: string
+        entity_type:
+          type: string
+        entity_id:
+          type: integer
+        content:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - board_id
+        - user_id
+        - action
+        - entity_type
+
+    ActivityListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Activity'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+      required:
+        - data
+        - total
+        - page
+        - limit
+
+    ListAutoAssignment:
+      type: object
+      properties:
+        id:
+          type: integer
+        list_id:
+          type: integer
+        user_id:
+          type: integer
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+        - id
+        - list_id
+        - user_id
+
+    ListTransitionRule:
+      type: object
+      properties:
+        id:
+          type: integer
+        board_id:
+          type: integer
+        from_list_id:
+          type: integer
+        from_list:
+          $ref: '#/components/schemas/List'
+        to_list_id:
+          type: integer
+        to_list:
+          $ref: '#/components/schemas/List'
+      required:
+        - id
+        - board_id
+        - from_list_id
+        - to_list_id
+
+    Webhook:
+      type: object
+      properties:
+        id:
+          type: integer
+        board_id:
+          type: integer
+        url:
+          type: string
+        events:
+          type: array
+          items:
+            type: string
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - board_id
+        - url
+        - events
+        - is_active
+
+    # CFD数据点
+    CFDDataPoint:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        list_counts:
+          type: object
+          additionalProperties:
+            type: integer
+      required:
+        - date
+        - list_counts
+
+    CFDResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CFDDataPoint'
+        lists:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              color:
+                type: string
+      required:
+        - data
+        - lists
+
+    CycleTimeResponse:
+      type: object
+      properties:
+        average_cycle_time:
+          type: number
+          description: 平均周期时间（小时）
+        average_lead_time:
+          type: number
+          description: 平均前置时间（小时）
+        card_count:
+          type: integer
+        cards:
+          type: array
+          items:
+            type: object
+            properties:
+              card_id:
+                type: integer
+              card_title:
+                type: string
+              cycle_time:
+                type: number
+              lead_time:
+                type: number
+              completed_at:
+                type: string
+                format: date-time
+      required:
+        - average_cycle_time
+        - average_lead_time
+        - card_count
+
+    ThroughputResponse:
+      type: object
+      properties:
+        total_completed:
+          type: integer
+        daily_average:
+          type: number
+        weekly_data:
+          type: array
+          items:
+            type: object
+            properties:
+              week_start:
+                type: string
+                format: date
+              week_end:
+                type: string
+                format: date
+              count:
+                type: integer
+      required:
+        - total_completed
+        - daily_average
 
     # 请求类型
     RegisterRequest:
@@ -949,12 +2203,39 @@ components:
         is_public:
           type: boolean
 
+    CreateSwimlaneRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        color:
+          type: string
+          maxLength: 7
+      required:
+        - name
+
+    UpdateSwimlaneRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        position:
+          type: integer
+        color:
+          type: string
+          maxLength: 7
+
     CreateListRequest:
       type: object
       properties:
         title:
           type: string
           maxLength: 100
+        wip_limit:
+          type: integer
+          nullable: true
       required:
         - title
 
@@ -966,6 +2247,9 @@ components:
           maxLength: 100
         position:
           type: integer
+        wip_limit:
+          type: integer
+          nullable: true
 
     CreateCardRequest:
       type: object
@@ -975,12 +2259,18 @@ components:
           maxLength: 200
         description:
           type: string
+        swimlane_id:
+          type: integer
+          nullable: true
         due_date:
           type: string
           format: date-time
           nullable: true
         cover:
           type: string
+        assignee_id:
+          type: integer
+          nullable: true
       required:
         - title
 
@@ -996,12 +2286,18 @@ components:
           type: integer
         list_id:
           type: integer
+        swimlane_id:
+          type: integer
+          nullable: true
         due_date:
           type: string
           format: date-time
           nullable: true
         cover:
           type: string
+        assignee_id:
+          type: integer
+          nullable: true
 
     MoveCardRequest:
       type: object
@@ -1013,6 +2309,35 @@ components:
       required:
         - list_id
 
+    AssignCardRequest:
+      type: object
+      properties:
+        assignee_id:
+          type: integer
+          nullable: true
+      required:
+        - assignee_id
+
+    CreateChecklistItemRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          maxLength: 200
+      required:
+        - content
+
+    UpdateChecklistItemRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          maxLength: 200
+        completed:
+          type: boolean
+        position:
+          type: integer
+
     CreateCommentRequest:
       type: object
       properties:
@@ -1020,6 +2345,12 @@ components:
           type: string
       required:
         - content
+
+    UpdateCommentRequest:
+      type: object
+      properties:
+        content:
+          type: string
 
     CreateLabelRequest:
       type: object
@@ -1033,6 +2364,104 @@ components:
       required:
         - name
         - color
+
+    UpdateLabelRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 50
+        color:
+          type: string
+          maxLength: 7
+
+    AddBoardMemberRequest:
+      type: object
+      properties:
+        user_id:
+          type: integer
+        role:
+          type: string
+          enum:
+            - admin
+            - member
+            - observer
+          default: member
+      required:
+        - user_id
+
+    UpdateMemberRoleRequest:
+      type: object
+      properties:
+        role:
+          type: string
+          enum:
+            - admin
+            - member
+            - observer
+      required:
+        - role
+
+    SetAutoAssignmentRequest:
+      type: object
+      properties:
+        user_id:
+          type: integer
+      required:
+        - user_id
+
+    CreateTransitionRuleRequest:
+      type: object
+      properties:
+        from_list_id:
+          type: integer
+        to_list_id:
+          type: integer
+      required:
+        - from_list_id
+        - to_list_id
+
+    CreateWebhookRequest:
+      type: object
+      properties:
+        url:
+          type: string
+          maxLength: 500
+        events:
+          type: array
+          items:
+            type: string
+            enum:
+              - card.created
+              - card.updated
+              - card.moved
+              - card.deleted
+              - card.completed
+              - card.assigned
+              - comment.created
+              - checklist.completed
+        secret:
+          type: string
+          maxLength: 100
+      required:
+        - url
+        - events
+
+    UpdateWebhookRequest:
+      type: object
+      properties:
+        url:
+          type: string
+          maxLength: 500
+        events:
+          type: array
+          items:
+            type: string
+        is_active:
+          type: boolean
+        secret:
+          type: string
+          maxLength: 100
 
     # 响应类型
     ErrorResponse:

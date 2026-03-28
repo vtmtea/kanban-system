@@ -25,7 +25,7 @@ func GetLists(c *gin.Context) {
 	database.DB.Where("board_id = ?", boardID).
 		Order("position ASC").
 		Preload("Cards", func(db *gorm.DB) *gorm.DB {
-			return db.Order("position ASC")
+			return db.Order("position ASC").Preload("Labels").Preload("Assignee").Preload("ChecklistItems")
 		}).
 		Find(&lists)
 
@@ -54,8 +54,8 @@ func CreateList(c *gin.Context) {
 	}
 
 	var member models.BoardMember
-	if database.DB.Where("board_id = ? AND user_id = ?", boardID, userID).First(&member).Error != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have access to this board"})
+	if database.DB.Where("board_id = ? AND user_id = ? AND role IN ?", boardID, userID, []string{"owner", "admin"}).First(&member).Error != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have permission to create lists"})
 		return
 	}
 
@@ -73,12 +73,16 @@ func CreateList(c *gin.Context) {
 		BoardID:  uint(boardID),
 		Title:    req.Title,
 		Position: maxPosition + 1,
+		WipLimit: req.WipLimit,
 	}
 
 	if err := database.DB.Create(&list).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create list"})
 		return
 	}
+
+	// 记录活动
+	logActivityByBoardID(uint(boardID), userID, "created", "list", list.ID, "Created list: "+list.Title)
 
 	c.JSON(http.StatusCreated, listToAPI(list))
 }
@@ -100,8 +104,8 @@ func UpdateList(c *gin.Context) {
 
 	// 检查看板权限
 	var member models.BoardMember
-	if database.DB.Where("board_id = ? AND user_id = ?", list.BoardID, userID).First(&member).Error != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have access to this board"})
+	if database.DB.Where("board_id = ? AND user_id = ? AND role IN ?", list.BoardID, userID, []string{"owner", "admin"}).First(&member).Error != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have permission to update this list"})
 		return
 	}
 
@@ -117,11 +121,17 @@ func UpdateList(c *gin.Context) {
 	if req.Position != nil {
 		list.Position = *req.Position
 	}
+	if req.WipLimit != nil {
+		list.WipLimit = req.WipLimit
+	}
 
 	if err := database.DB.Save(&list).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update list"})
 		return
 	}
+
+	// 记录活动
+	logActivityByBoardID(list.BoardID, userID, "updated", "list", list.ID, "Updated list: "+list.Title)
 
 	c.JSON(http.StatusOK, listToAPI(list))
 }
@@ -153,5 +163,115 @@ func DeleteList(c *gin.Context) {
 		return
 	}
 
+	// 记录活动
+	logActivityByBoardID(list.BoardID, userID, "deleted", "list", list.ID, "Deleted list: "+list.Title)
+
 	c.JSON(http.StatusOK, api.MessageResponse{Message: "List deleted successfully"})
+}
+
+// GetAutoAssignments 获取列的自动指派配置
+func GetAutoAssignments(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	listID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid list ID"})
+		return
+	}
+
+	var list models.List
+	if err := database.DB.First(&list, listID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "List not found"})
+		return
+	}
+
+	// 检查权限
+	var member models.BoardMember
+	if database.DB.Where("board_id = ? AND user_id = ?", list.BoardID, userID).First(&member).Error != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have access to this list"})
+		return
+	}
+
+	var assignments []models.ListAutoAssignment
+	database.DB.Where("list_id = ?", listID).Preload("User").Find(&assignments)
+
+	result := make([]api.ListAutoAssignment, len(assignments))
+	for i, a := range assignments {
+		result[i] = *listAutoAssignmentToAPI(a)
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// SetAutoAssignment 设置列的自动指派
+func SetAutoAssignment(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	listID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid list ID"})
+		return
+	}
+
+	var list models.List
+	if err := database.DB.First(&list, listID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "List not found"})
+		return
+	}
+
+	// 检查权限
+	var member models.BoardMember
+	if database.DB.Where("board_id = ? AND user_id = ? AND role IN ?", list.BoardID, userID, []string{"owner", "admin"}).First(&member).Error != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have permission to set auto assignment"})
+		return
+	}
+
+	var req api.SetAutoAssignmentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 删除现有配置
+	database.DB.Where("list_id = ?", listID).Delete(&models.ListAutoAssignment{})
+
+	// 创建新配置
+	assignment := models.ListAutoAssignment{
+		ListID: uint(listID),
+		UserID: uint(req.UserId),
+	}
+
+	if err := database.DB.Create(&assignment).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set auto assignment"})
+		return
+	}
+
+	database.DB.Preload("User").First(&assignment, assignment.ID)
+
+	c.JSON(http.StatusCreated, listAutoAssignmentToAPI(assignment))
+}
+
+// DeleteAutoAssignment 删除列的自动指派
+func DeleteAutoAssignment(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	listID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid list ID"})
+		return
+	}
+
+	var list models.List
+	if err := database.DB.First(&list, listID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "List not found"})
+		return
+	}
+
+	// 检查权限
+	var member models.BoardMember
+	if database.DB.Where("board_id = ? AND user_id = ? AND role IN ?", list.BoardID, userID, []string{"owner", "admin"}).First(&member).Error != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have permission to delete auto assignment"})
+		return
+	}
+
+	database.DB.Where("list_id = ?", listID).Delete(&models.ListAutoAssignment{})
+
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "Auto assignment deleted successfully"})
 }

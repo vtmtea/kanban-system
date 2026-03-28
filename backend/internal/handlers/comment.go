@@ -28,11 +28,7 @@ func CreateComment(c *gin.Context) {
 	}
 
 	// 检查权限
-	var list models.List
-	database.DB.First(&list, card.ListID)
-
-	var member models.BoardMember
-	if database.DB.Where("board_id = ? AND user_id = ?", list.BoardID, userID).First(&member).Error != nil {
+	if !checkBoardAccess(card.ListID, userID, "member") {
 		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have access to this board"})
 		return
 	}
@@ -57,6 +53,9 @@ func CreateComment(c *gin.Context) {
 	// 加载用户信息
 	database.DB.Preload("User").First(&comment, comment.ID)
 
+	// 记录活动
+	logActivity(card.ListID, userID, "created", "comment", comment.ID, "Added a comment")
+
 	c.JSON(http.StatusCreated, commentToAPI(comment))
 }
 
@@ -80,6 +79,48 @@ func GetComments(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, result)
+}
+
+// UpdateComment 更新评论
+func UpdateComment(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	commentID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		return
+	}
+
+	var comment models.Comment
+	if err := database.DB.First(&comment, commentID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		return
+	}
+
+	// 只有评论作者可以修改
+	if comment.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only the author can update the comment"})
+		return
+	}
+
+	var req api.UpdateCommentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.Content != nil {
+		comment.Content = *req.Content
+	}
+
+	if err := database.DB.Save(&comment).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update comment"})
+		return
+	}
+
+	// 加载用户信息
+	database.DB.Preload("User").First(&comment, comment.ID)
+
+	c.JSON(http.StatusOK, commentToAPI(comment))
 }
 
 // DeleteComment 删除评论

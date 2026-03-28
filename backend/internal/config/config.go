@@ -16,6 +16,7 @@ type Config struct {
 	ServerPort string
 	JWTSecret  string
 	JWTExpiry  time.Duration
+	UploadDir  string
 }
 
 var AppConfig *Config
@@ -35,6 +36,7 @@ func LoadConfig() *Config {
 		ServerPort: getEnv("SERVER_PORT", "8080"),
 		JWTSecret:  getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
 		JWTExpiry:  expiry,
+		UploadDir:  getEnv("UPLOAD_DIR", "./uploads"),
 	}
 
 	AppConfig = config

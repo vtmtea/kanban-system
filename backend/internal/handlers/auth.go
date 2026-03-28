@@ -3,6 +3,8 @@ package handlers
 import (
 	"net/http"
 
+	openapi_types "github.com/oapi-codegen/runtime/types"
+
 	"kanban-system/backend/internal/api"
 	"kanban-system/backend/internal/database"
 	"kanban-system/backend/internal/middleware"
@@ -149,10 +151,11 @@ func UpdateCurrentUser(c *gin.Context) {
 
 // userToAPI 将 models.User 转换为 api.User
 func userToAPI(user models.User) *api.User {
+	email := openapi_types.Email(user.Email)
 	return &api.User{
 		Id:        int(user.ID),
 		Username:  user.Username,
-		Email:     user.Email,
+		Email:     email,
 		Nickname:  &user.Nickname,
 		Avatar:    &user.Avatar,
 		CreatedAt: &user.CreatedAt,
