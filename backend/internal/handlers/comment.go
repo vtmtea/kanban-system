@@ -1,0 +1,111 @@
+package handlers
+
+import (
+	"net/http"
+	"strconv"
+
+	"kanban-system/backend/internal/database"
+	"kanban-system/backend/internal/middleware"
+	"kanban-system/backend/internal/models"
+
+	"github.com/gin-gonic/gin"
+)
+
+// CreateCommentRequest 创建评论请求
+type CreateCommentRequest struct {
+	Content string `json:"content" binding:"required"`
+}
+
+// CreateComment 创建评论
+func CreateComment(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	cardID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid card ID"})
+		return
+	}
+
+	var card models.Card
+	if err := database.DB.First(&card, cardID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Card not found"})
+		return
+	}
+
+	// 检查权限
+	var list models.List
+	database.DB.First(&list, card.ListID)
+
+	var member models.BoardMember
+	if database.DB.Where("board_id = ? AND user_id = ?", list.BoardID, userID).First(&member).Error != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have access to this board"})
+		return
+	}
+
+	var req CreateCommentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	comment := models.Comment{
+		CardID:  uint(cardID),
+		UserID:  userID,
+		Content: req.Content,
+	}
+
+	if err := database.DB.Create(&comment).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create comment"})
+		return
+	}
+
+	// 加载用户信息
+	database.DB.Preload("User").First(&comment, comment.ID)
+
+	c.JSON(http.StatusCreated, comment)
+}
+
+// GetComments 获取卡片的评论
+func GetComments(c *gin.Context) {
+	cardID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid card ID"})
+		return
+	}
+
+	var comments []models.Comment
+	database.DB.Where("card_id = ?", cardID).
+		Preload("User").
+		Order("created_at DESC").
+		Find(&comments)
+
+	c.JSON(http.StatusOK, comments)
+}
+
+// DeleteComment 删除评论
+func DeleteComment(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	commentID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid comment ID"})
+		return
+	}
+
+	var comment models.Comment
+	if err := database.DB.First(&comment, commentID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Comment not found"})
+		return
+	}
+
+	// 只有评论作者可以删除
+	if comment.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only the author can delete the comment"})
+		return
+	}
+
+	if err := database.DB.Delete(&comment).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete comment"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Comment deleted successfully"})
+}
