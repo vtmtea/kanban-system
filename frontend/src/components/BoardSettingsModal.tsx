@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { boardApi, swimlaneApi, webhookApi, transitionRuleApi, labelApi } from '@/services/api';
 import { AnalyticsDashboard } from '@/components/AnalyticsDashboard';
@@ -9,78 +9,29 @@ interface BoardSettingsModalProps {
   onClose: () => void;
 }
 
-type TabType = 'members' | 'swimlanes' | 'labels' | 'webhooks' | 'rules' | 'analytics';
-
 export function BoardSettingsModal({ boardId, onClose }: BoardSettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<TabType>('members');
+  const [activeSection, setActiveSection] = useState<string>('team');
   const queryClient = useQueryClient();
 
-  // 获取看板详情
-  const { data: board } = useQuery({
-    queryKey: ['board', boardId],
-    queryFn: () => boardApi.getOne(boardId),
-  });
+  // Queries
+  const { data: board } = useQuery({ queryKey: ['board', boardId], queryFn: () => boardApi.getOne(boardId) });
+  const { data: members } = useQuery({ queryKey: ['board', boardId, 'members'], queryFn: () => boardApi.getMembers(boardId) });
+  const { data: swimlanes } = useQuery({ queryKey: ['board', boardId, 'swimlanes'], queryFn: () => swimlaneApi.getAll(boardId) });
+  const { data: labels } = useQuery({ queryKey: ['labels', boardId], queryFn: () => labelApi.getAll(boardId) });
+  const { data: webhooks } = useQuery({ queryKey: ['board', boardId, 'webhooks'], queryFn: () => webhookApi.getAll(boardId) });
+  const { data: rules } = useQuery({ queryKey: ['board', boardId, 'transition-rules'], queryFn: () => transitionRuleApi.getAll(boardId) });
 
-  // 获取成员
-  const { data: members } = useQuery({
-    queryKey: ['board', boardId, 'members'],
-    queryFn: () => boardApi.getMembers(boardId),
-  });
-
-  // 获取泳道
-  const { data: swimlanes } = useQuery({
-    queryKey: ['board', boardId, 'swimlanes'],
-    queryFn: () => swimlaneApi.getAll(boardId),
-  });
-
-  // 获取标签
-  const { data: labels } = useQuery({
-    queryKey: ['labels', boardId],
-    queryFn: () => labelApi.getAll(boardId),
-  });
-
-  // 获取 Webhooks
-  const { data: webhooks } = useQuery({
-    queryKey: ['board', boardId, 'webhooks'],
-    queryFn: () => webhookApi.getAll(boardId),
-  });
-
-  // 获取状态转移规则
-  const { data: rules } = useQuery({
-    queryKey: ['board', boardId, 'transition-rules'],
-    queryFn: () => transitionRuleApi.getAll(boardId),
-  });
-
-  // 添加成员（未来功能）
-  const addMemberMutation = useMutation({
-    mutationFn: (data: { user_id: number; role: 'admin' | 'member' | 'observer' }) =>
-      boardApi.addMember(boardId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['board', boardId, 'members'] });
-    },
-  });
-
-  // 避免未使用警告
-  void addMemberMutation;
-
-  // 更新成员角色
+  // Mutations
   const updateRoleMutation = useMutation({
-    mutationFn: (data: { userId: number; role: 'admin' | 'member' | 'observer' }) =>
-      boardApi.updateMemberRole(boardId, data.userId, { role: data.role }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['board', boardId, 'members'] });
-    },
+    mutationFn: (data: { userId: number; role: 'admin' | 'member' | 'observer' }) => boardApi.updateMemberRole(boardId, data.userId, { role: data.role }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['board', boardId, 'members'] }); },
   });
 
-  // 移除成员
   const removeMemberMutation = useMutation({
     mutationFn: (userId: number) => boardApi.removeMember(boardId, userId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['board', boardId, 'members'] });
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['board', boardId, 'members'] }); },
   });
 
-  // 创建泳道
   const createSwimlaneMutation = useMutation({
     mutationFn: (name: string) => swimlaneApi.create(boardId, { name }),
     onSuccess: () => {
@@ -89,7 +40,6 @@ export function BoardSettingsModal({ boardId, onClose }: BoardSettingsModalProps
     },
   });
 
-  // 删除泳道
   const deleteSwimlaneMutation = useMutation({
     mutationFn: (id: number) => swimlaneApi.delete(id),
     onSuccess: () => {
@@ -98,381 +48,414 @@ export function BoardSettingsModal({ boardId, onClose }: BoardSettingsModalProps
     },
   });
 
-  // 创建标签
   const createLabelMutation = useMutation({
     mutationFn: (data: { name: string; color: string }) => labelApi.create(boardId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['labels', boardId] });
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['labels', boardId] }); },
   });
 
-  // 删除标签
   const deleteLabelMutation = useMutation({
     mutationFn: (id: number) => labelApi.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['labels', boardId] });
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['labels', boardId] }); },
   });
 
-  // 创建 Webhook
   const createWebhookMutation = useMutation({
-    mutationFn: (data: { url: string; events: ('card.created' | 'card.updated' | 'card.moved' | 'card.deleted' | 'card.completed' | 'card.assigned' | 'comment.created' | 'checklist.completed')[]; secret?: string }) =>
-      webhookApi.create(boardId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['board', boardId, 'webhooks'] });
-    },
+    mutationFn: (data: { url: string; events: any[] }) => webhookApi.create(boardId, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['board', boardId, 'webhooks'] }); },
   });
 
-  // 删除 Webhook
   const deleteWebhookMutation = useMutation({
     mutationFn: (id: number) => webhookApi.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['board', boardId, 'webhooks'] });
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['board', boardId, 'webhooks'] }); },
   });
 
-  // 创建状态转移规则
   const createRuleMutation = useMutation({
-    mutationFn: (data: { from_list_id: number; to_list_id: number }) =>
-      transitionRuleApi.create(boardId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['board', boardId, 'transition-rules'] });
-    },
+    mutationFn: (data: { from_list_id: number; to_list_id: number }) => transitionRuleApi.create(boardId, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['board', boardId, 'transition-rules'] }); },
   });
 
-  // 删除状态转移规则
   const deleteRuleMutation = useMutation({
     mutationFn: (id: number) => transitionRuleApi.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['board', boardId, 'transition-rules'] });
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['board', boardId, 'transition-rules'] }); },
   });
 
   const boardData = board?.data;
   const lists = boardData?.lists || [];
 
-  const tabs = [
-    { key: 'members', label: '成员管理' },
-    { key: 'swimlanes', label: '泳道' },
-    { key: 'labels', label: '标签' },
-    { key: 'webhooks', label: 'Webhook' },
-    { key: 'rules', label: '转移规则' },
-    { key: 'analytics', label: '数据分析' },
-  ];
+  const scrollToSection = (id: string) => {
+    setActiveSection(id);
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Static assets for mock visual design
+  const defaultAva = "https://i.pravatar.cc/150?u=a04258114e29026702d";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4 max-h-[80vh] overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="text-xl font-bold text-gray-800">看板设置</h2>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center"
-          >
-            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+    <div className="fixed inset-0 z-[150] bg-[#fbfcfd] flex flex-col font-sans animate-slide-up-fade">
+      {/* Top Navbar */}
+      <header className="h-[72px] bg-white flex items-center justify-between px-8 shrink-0 border-b border-gray-100 z-10 w-full">
+        <div className="flex items-center gap-12 h-full">
+          <div className="font-extrabold text-[17px] text-gray-900 tracking-tight">The Fluid Architect</div>
+          <div className="flex items-end h-full mt-1.5">
+            <a href="#" onClick={(e) => { e.preventDefault(); onClose(); }} className="text-gray-500 font-semibold pb-4 px-2 hover:text-gray-900 mr-6 transition-colors">Dashboard</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); onClose(); }} className="text-gray-500 font-semibold pb-4 px-2 hover:text-gray-900 mr-6 transition-colors">Boards</a>
+            <a href="#" className="text-gray-500 font-semibold pb-4 px-2 hover:text-gray-900 mr-6 transition-colors">Teams</a>
+            <a href="#" className="text-[#0d6efd] font-bold pb-4 px-2 border-b-[3px] border-[#0d6efd]">Settings</a>
+          </div>
+        </div>
+        <div className="flex items-center gap-5">
+          <button className="text-gray-400 hover:text-gray-600">
+             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
           </button>
+          <button className="text-gray-400 hover:text-gray-600">
+             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          </button>
+          <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden ml-1 border border-gray-100 cursor-pointer">
+             <img src={defaultAva} alt="Profile" className="w-full h-full object-cover" />
+          </div>
         </div>
+      </header>
 
-        {/* Tabs */}
-        <div className="flex border-b px-6">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key as TabType)}
-              className={`px-4 py-3 text-sm font-medium border-b-2 -mb-1 ${
-                activeTab === tab.key
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {tab.label}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Main Settings Left Sidebar */}
+        <aside className="w-[280px] bg-[#fbfcfd] flex flex-col justify-between shrink-0 border-r border-gray-100/60 pb-8 py-8">
+          <div>
+            <div className="px-8 flex items-center gap-3 mb-10">
+              <div className="w-10 h-10 bg-[#0d6efd] rounded-xl flex items-center justify-center shadow-md">
+                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="font-extrabold text-[#0d6efd] leading-none text-[15px]">{boardData?.title || 'Project Alpha'}</h2>
+                <p className="text-[10px] text-gray-400 font-extrabold tracking-widest mt-1.5 uppercase">Premium Tier</p>
+              </div>
+            </div>
+
+            <nav className="space-y-1">
+              <button className="w-full flex items-center gap-4 px-8 py-3 text-gray-500 hover:bg-gray-100/50 hover:text-gray-900 transition-colors text-[14px] font-bold">
+                <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
+                User Profile
+              </button>
+              <button className="w-full flex items-center gap-4 px-8 py-3 bg-blue-50/50 text-[#0d6efd] border-l-[3px] border-[#0d6efd] transition-colors text-[14px] font-bold">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m3-4h1m-1 4h1m-5 8h5" /></svg>
+                Workspace
+              </button>
+              <button className="w-full flex items-center gap-4 px-8 py-3 text-gray-500 hover:bg-gray-100/50 hover:text-gray-900 transition-colors text-[14px] font-bold border-l-[3px] border-transparent">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                Team
+              </button>
+              <button className="w-full flex items-center gap-4 px-8 py-3 text-gray-500 hover:bg-gray-100/50 hover:text-gray-900 transition-colors text-[14px] font-bold border-l-[3px] border-transparent">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                Notifications
+              </button>
+              <button onClick={() => setActiveSection('analytics')} className={`w-full flex items-center gap-4 px-8 py-3 text-gray-500 hover:bg-gray-100/50 hover:text-gray-900 transition-colors text-[14px] font-bold border-l-[3px] border-transparent ${activeSection === 'analytics' ? 'bg-blue-50/50 text-[#0d6efd] border-[#0d6efd]' : ''}`}>
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2-2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                Analytics
+              </button>
+            </nav>
+          </div>
+
+          <div className="px-8 mt-auto pt-8">
+            <button className="w-full flex items-center justify-center gap-2 bg-[#0d6efd] hover:bg-blue-700 text-white py-3 rounded-xl text-[13px] font-bold transition-all shadow-md active:scale-95 mb-8">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+              Invite Member
             </button>
-          ))}
-        </div>
+            
+            <a href="#" className="flex items-center gap-3 text-gray-500 hover:text-gray-900 text-sm font-bold mb-5 transition-colors">
+               <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+               Logout
+            </a>
+            <a href="#" className="flex items-center gap-3 text-gray-500 hover:text-gray-900 text-sm font-bold transition-colors">
+               <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+               Support
+            </a>
+          </div>
+        </aside>
 
-        {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[60vh]">
-          {/* Members Tab */}
-          {activeTab === 'members' && (
-            <div>
-              <div className="mb-4">
-                <h3 className="text-lg font-medium mb-2">成员列表</h3>
-                <div className="space-y-2">
-                  {members?.data?.map((member: BoardMember) => (
-                    <div key={member.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center text-white font-bold">
-                          {(member.user?.nickname || member.user?.username || '?')[0].toUpperCase()}
+        {/* Scrollable Main Area */}
+        <main className="flex-1 overflow-y-auto px-12 lg:px-20 py-12 custom-scrollbar relative">
+           
+           <div className="max-w-[1000px] flex gap-12">
+              
+              {/* Inner Anchor Nav */}
+              <div className="w-48 shrink-0 hidden lg:block sticky top-0 h-fit">
+                 <h1 className="text-[32px] font-extrabold text-gray-900 tracking-tight leading-none mb-4">Settings</h1>
+                 <p className="text-gray-500 text-[13px] font-medium leading-relaxed mb-10">Manage your workspace preferences, labels, automations and team permissions.</p>
+
+                 <div className="bg-white rounded-xl py-3 px-2 shadow-sm border border-gray-100">
+                    <button onClick={() => scrollToSection('team')} className={`w-full flex items-center gap-3 px-4 py-2 text-[14px] font-bold rounded-lg transition-colors ${activeSection === 'team' ? 'bg-[#f4f6f8] text-[#0d6efd]' : 'text-gray-500 hover:bg-gray-50'}`}>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                        Team
+                    </button>
+                    <button onClick={() => scrollToSection('swimlanes')} className={`w-full flex items-center gap-3 px-4 py-2 mt-1 text-[14px] font-bold rounded-lg transition-colors ${activeSection === 'swimlanes' ? 'bg-[#f4f6f8] text-[#0d6efd]' : 'text-gray-500 hover:bg-gray-50'}`}>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" /></svg>
+                        Swimlanes
+                    </button>
+                    <button onClick={() => scrollToSection('labels')} className={`w-full flex items-center gap-3 px-4 py-2 mt-1 text-[14px] font-bold rounded-lg transition-colors ${activeSection === 'labels' ? 'bg-[#f4f6f8] text-[#0d6efd]' : 'text-gray-500 hover:bg-gray-50'}`}>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
+                        Labels
+                    </button>
+                    <button onClick={() => scrollToSection('automations')} className={`w-full flex items-center gap-3 px-4 py-2 mt-1 text-[14px] font-bold rounded-lg transition-colors ${activeSection === 'automations' ? 'bg-[#f4f6f8] text-[#0d6efd]' : 'text-gray-500 hover:bg-gray-50'}`}>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        Automations
+                    </button>
+                 </div>
+              </div>
+
+              {/* Cards Flow */}
+              <div className="flex-1 space-y-8 pb-32">
+                 
+                 {activeSection === 'analytics' ? (
+                   <div className="bg-white rounded-[1.5rem] p-8 lg:p-10 shadow-sm border border-gray-100">
+                     <h3 className="text-xl font-extrabold text-gray-900 mb-6 tracking-tight">Analytics & Reports</h3>
+                     <AnalyticsDashboard boardId={boardId} />
+                   </div>
+                 ) : (
+                   <>
+                     {/* Team Management */}
+                     <div id="team" className="bg-white rounded-[1.5rem] p-8 lg:p-10 shadow-sm border border-gray-100">
+                        <div className="flex items-center justify-between mb-8">
+                           <div>
+                              <h3 className="text-xl font-extrabold text-gray-900 mb-1.5 tracking-tight">Team Management</h3>
+                              <p className="text-[13px] text-gray-500 font-medium">Invite and manage roles for your workspace members.</p>
+                           </div>
+                           <button className="px-5 py-2.5 bg-[#0d6efd] text-white rounded-xl text-sm font-bold shadow-md hover:bg-blue-700 active:scale-95 transition-all flex items-center gap-2">
+                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+                             Invite Member
+                           </button>
                         </div>
+                        
+                        <div className="space-y-4">
+                           {members?.data?.map((member: BoardMember, i: number) => {
+                             const name = member.user?.nickname || member.user?.username || 'Unknown';
+                             return (
+                               <div key={member.id} className="flex items-center justify-between group py-3 pr-2 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 -mx-4 px-4 rounded-xl transition-colors">
+                                  <div className="flex items-center gap-4">
+                                     <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-[13px] font-extrabold shadow-sm overflow-hidden">
+                                        {i === 0 ? <img src="https://i.pravatar.cc/150?img=3" alt="ava" className="w-full h-full object-cover"/> : name[0].toUpperCase()}
+                                     </div>
+                                     <div>
+                                        <div className="font-extrabold text-gray-900 text-[14px]">{name}</div>
+                                        <div className="text-[12px] text-gray-400 font-medium mt-0.5">{name.toLowerCase().replace(' ', '.')}@kineticcore.io</div>
+                                     </div>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-4">
+                                     <select
+                                        value={member.role}
+                                        onChange={(e) => updateRoleMutation.mutate({ userId: member.user_id, role: e.target.value as 'admin' | 'member' | 'observer' })}
+                                        className="appearance-none bg-blue-50/80 text-[#0d6efd] font-extrabold text-[10px] uppercase tracking-widest px-4 py-2 rounded-full cursor-pointer hover:bg-blue-100 transition-colors outline-none text-center"
+                                     >
+                                        <option value="admin">Admin</option>
+                                        <option value="member">Member</option>
+                                        <option value="observer">Observer</option>
+                                     </select>
+                                     
+                                     {member.role !== 'owner' && (
+                                       <button onClick={() => removeMemberMutation.mutate(member.user_id)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
+                                       </button>
+                                     )}
+                                  </div>
+                               </div>
+                             );
+                           })}
+                        </div>
+                     </div>
+
+                     {/* Swimlanes */}
+                     <div id="swimlanes" className="bg-white rounded-[1.5rem] p-8 lg:p-10 shadow-sm border border-gray-100">
+                        <div className="mb-8">
+                           <h3 className="text-xl font-extrabold text-gray-900 mb-1.5 tracking-tight">Swimlanes Setup</h3>
+                           <p className="text-[13px] text-gray-500 font-medium">Create horizontal swimlanes to group cards on your board.</p>
+                        </div>
+                        
+                        <div className="flex items-center gap-3 mb-8 bg-[#f8fafc] p-3 rounded-2xl border border-gray-100/50 focus-within:border-[#0d6efd]/30 transition-colors">
+                           <input
+                              type="text"
+                              placeholder="New Swimlane Name..."
+                              className="bg-transparent border-none outline-none flex-1 font-bold text-[14px] text-gray-900 placeholder-gray-400 focus:ring-0 px-2"
+                              onKeyDown={(e) => {
+                                 if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                                    createSwimlaneMutation.mutate(e.currentTarget.value.trim());
+                                    e.currentTarget.value = '';
+                                 }
+                              }}
+                           />
+                           <button
+                              onClick={() => {
+                                 const input = document.querySelector('input[placeholder="New Swimlane Name..."]') as HTMLInputElement;
+                                 if (input?.value.trim()) {
+                                    createSwimlaneMutation.mutate(input.value.trim());
+                                    input.value = '';
+                                 }
+                              }}
+                              className="px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold shadow-md hover:bg-black transition-all"
+                           >
+                              Add
+                           </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3">
+                           {swimlanes?.data?.map((swimlane: Swimlane) => (
+                              <div key={swimlane.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl hover:shadow-sm transition-shadow group">
+                                 <div className="flex items-center gap-3">
+                                    <div className="w-2.5 h-2.5 rounded-full ring-2 ring-gray-100" style={{ backgroundColor: swimlane.color || '#0d6efd' }} />
+                                    <span className="font-extrabold text-gray-800 text-[14px]">{swimlane.name}</span>
+                                 </div>
+                                 <button onClick={() => deleteSwimlaneMutation.mutate(swimlane.id)} className="text-gray-400 hover:text-red-500 uppercase tracking-widest text-[10px] font-extrabold border border-transparent hover:border-red-100 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100">
+                                    Delete
+                                 </button>
+                              </div>
+                           ))}
+                        </div>
+                     </div>
+
+                     {/* Labels */}
+                     <div id="labels" className="bg-white rounded-[1.5rem] p-8 lg:p-10 shadow-sm border border-gray-100">
+                        <div className="mb-8">
+                           <h3 className="text-xl font-extrabold text-gray-900 mb-1.5 tracking-tight">Labels</h3>
+                           <p className="text-[13px] text-gray-500 font-medium">Create customized tags to categorize your cards easily.</p>
+                        </div>
+                        
+                        <div className="flex items-center gap-3 mb-8 bg-[#f8fafc] p-3 rounded-2xl border border-gray-100/50 focus-within:border-[#0d6efd]/30 transition-colors">
+                           <input type="color" defaultValue="#0d6efd" className="w-10 h-10 rounded-xl cursor-pointer bg-transparent border-0 p-0" id="label-color" />
+                           <input
+                              type="text"
+                              placeholder="Label Name"
+                              id="label-name"
+                              className="bg-transparent border-none outline-none flex-1 font-bold text-[14px] text-gray-900 placeholder-gray-400 focus:ring-0 px-2"
+                              onKeyDown={(e) => {
+                                 const colorInput = document.getElementById('label-color') as HTMLInputElement;
+                                 if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                                    createLabelMutation.mutate({ name: e.currentTarget.value.trim(), color: colorInput.value || '#0d6efd' });
+                                    e.currentTarget.value = '';
+                                 }
+                              }}
+                           />
+                           <button
+                              onClick={() => {
+                                 const nameInput = document.getElementById('label-name') as HTMLInputElement;
+                                 const colorInput = document.getElementById('label-color') as HTMLInputElement;
+                                 if (nameInput?.value.trim()) {
+                                    createLabelMutation.mutate({ name: nameInput.value.trim(), color: colorInput?.value || '#0d6efd' });
+                                    nameInput.value = '';
+                                 }
+                              }}
+                              className="px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold shadow-md hover:bg-black transition-all"
+                           >
+                              Create
+                           </button>
+                        </div>
+
+                        <div className="flex flex-wrap gap-3">
+                           {labels?.data?.map((label: Label) => (
+                              <div key={label.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-white font-extrabold text-[11px] uppercase tracking-wider shadow-sm group cursor-default" style={{ backgroundColor: label.color }}>
+                                 {label.name}
+                                 <button onClick={() => deleteLabelMutation.mutate(label.id)} className="w-4 h-4 rounded-full hover:bg-black/20 flex items-center justify-center transition-colors">
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                                 </button>
+                              </div>
+                           ))}
+                        </div>
+                     </div>
+
+                     {/* Automations */}
+                     <div id="automations" className="bg-white rounded-[1.5rem] p-8 lg:p-10 shadow-sm border border-gray-100">
+                        <div className="mb-10">
+                           <h3 className="text-xl font-extrabold text-gray-900 mb-1.5 tracking-tight">Automations</h3>
+                           <p className="text-[13px] text-gray-500 font-medium">Configure webhooks and list transition rules to automate logic.</p>
+                        </div>
+                        
+                        <div className="mb-10">
+                           <h4 className="text-[11px] font-extrabold text-gray-400 uppercase tracking-widest mb-4">Webhooks</h4>
+                           <div className="bg-[#f8fafc] p-5 rounded-2xl border border-gray-100 space-y-4 mb-6">
+                              <input type="url" id="webhook-url" placeholder="https://api.kineticcore.io/webhook" className="w-full bg-white px-4 py-3 border border-gray-200 rounded-xl font-medium text-sm focus:border-[#0d6efd] focus:ring-1 focus:ring-[#0d6efd] outline-none transition-all placeholder-gray-400" />
+                              <div className="flex flex-wrap gap-2 text-[12px] font-bold text-gray-600">
+                                 {['card.created', 'card.updated', 'card.moved', 'card.completed'].map((event) => (
+                                    <label key={event} className="flex items-center gap-2 bg-white px-3 py-1.5 border border-gray-200 rounded-lg cursor-pointer hover:border-[#0d6efd] transition-colors">
+                                       <input type="checkbox" value={event} className="webhook-event rounded border-gray-300 text-[#0d6efd] focus:ring-[#0d6efd]" />
+                                       {event}
+                                    </label>
+                                 ))}
+                              </div>
+                              <button onClick={() => {
+                                 const urlInput = document.getElementById('webhook-url') as HTMLInputElement;
+                                 const checkboxes = document.querySelectorAll('.webhook-event:checked') as NodeListOf<HTMLInputElement>;
+                                 const events = Array.from(checkboxes).map(cb => cb.value);
+                                 if (urlInput?.value.trim() && events.length > 0) {
+                                    createWebhookMutation.mutate({ url: urlInput.value.trim(), events });
+                                    urlInput.value = '';
+                                    checkboxes.forEach((cb) => (cb.checked = false));
+                                 }
+                              }} className="px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold shadow-sm hover:bg-black transition-colors w-full sm:w-auto">
+                                 Add Webhook
+                              </button>
+                           </div>
+
+                           <div className="space-y-3">
+                              {webhooks?.data?.map((webhook: Webhook) => (
+                                 <div key={webhook.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl group hover:shadow-sm">
+                                    <div>
+                                       <div className="font-bold text-gray-800 text-[14px] truncate w-64 md:w-full">{webhook.url}</div>
+                                       <div className="text-[11px] text-gray-400 font-extrabold mt-1 tracking-wide">{webhook.events.join(', ')}</div>
+                                    </div>
+                                    <button onClick={() => deleteWebhookMutation.mutate(webhook.id)} className="text-red-500 font-extrabold text-[11px] uppercase tracking-widest bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all">Remove</button>
+                                 </div>
+                              ))}
+                           </div>
+                        </div>
+
                         <div>
-                          <div className="font-medium">{member.user?.nickname || member.user?.username}</div>
-                          <div className="text-sm text-gray-500">{member.role}</div>
+                           <h4 className="text-[11px] font-extrabold text-gray-400 uppercase tracking-widest mb-4">Transition Rules</h4>
+                           <div className="flex flex-col sm:flex-row items-center gap-3 mb-6 bg-[#f8fafc] p-4 rounded-2xl border border-gray-100">
+                              <select id="rule-from" className="bg-white border border-gray-200 text-gray-800 text-sm font-bold rounded-lg px-4 py-2.5 w-full outline-none focus:border-[#0d6efd]">
+                                 <option value="">Status From...</option>
+                                 {lists.map((list: List) => (<option key={list.id} value={list.id}>{list.title}</option>))}
+                              </select>
+                              <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                              <select id="rule-to" className="bg-white border border-gray-200 text-gray-800 text-sm font-bold rounded-lg px-4 py-2.5 w-full outline-none focus:border-[#0d6efd]">
+                                 <option value="">Status To...</option>
+                                 {lists.map((list: List) => (<option key={list.id} value={list.id}>{list.title}</option>))}
+                              </select>
+                              <button onClick={() => {
+                                 const fromId = (document.getElementById('rule-from') as HTMLSelectElement).value;
+                                 const toId = (document.getElementById('rule-to') as HTMLSelectElement).value;
+                                 if (fromId && toId && fromId !== toId) createRuleMutation.mutate({ from_list_id: Number(fromId), to_list_id: Number(toId) });
+                              }} className="px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold w-full sm:w-auto hover:bg-black transition-colors shrink-0">Add Rule</button>
+                           </div>
+                           
+                           <div className="space-y-3">
+                              {rules?.data?.map((rule: ListTransitionRule) => (
+                                 <div key={rule.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl group">
+                                    <div className="flex items-center gap-3">
+                                       <span className="font-extrabold text-gray-800 px-3 py-1 bg-gray-100 rounded-lg text-sm">{rule.from_list?.title}</span>
+                                       <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                       <span className="font-extrabold text-gray-800 px-3 py-1 bg-gray-100 rounded-lg text-sm">{rule.to_list?.title}</span>
+                                    </div>
+                                    <button onClick={() => deleteRuleMutation.mutate(rule.id)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all">
+                                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                 </div>
+                              ))}
+                           </div>
                         </div>
-                      </div>
-                      {member.role !== 'owner' && (
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={member.role}
-                            onChange={(e) => updateRoleMutation.mutate({
-                              userId: member.user_id,
-                              role: e.target.value as 'admin' | 'member' | 'observer',
-                            })}
-                            className="px-2 py-1 border rounded text-sm"
-                          >
-                            <option value="admin">管理员</option>
-                            <option value="member">成员</option>
-                            <option value="observer">观察者</option>
-                          </select>
-                          <button
-                            onClick={() => removeMemberMutation.mutate(member.user_id)}
-                            className="text-red-500 hover:text-red-600 text-sm"
-                          >
-                            移除
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="text-sm text-gray-500">
-                添加成员功能需要用户搜索，暂未实现
-              </div>
-            </div>
-          )}
 
-          {/* Swimlanes Tab */}
-          {activeTab === 'swimlanes' && (
-            <div>
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <input
-                    type="text"
-                    placeholder="新泳道名称"
-                    className="px-3 py-2 border rounded flex-1"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                        createSwimlaneMutation.mutate(e.currentTarget.value.trim());
-                        e.currentTarget.value = '';
-                      }
-                    }}
-                  />
-                  <button
-                    onClick={() => {
-                      const input = document.querySelector('input[placeholder="新泳道名称"]') as HTMLInputElement;
-                      if (input?.value.trim()) {
-                        createSwimlaneMutation.mutate(input.value.trim());
-                        input.value = '';
-                      }
-                    }}
-                    className="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600"
-                  >
-                    添加
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {swimlanes?.data?.map((swimlane: Swimlane) => (
-                    <div key={swimlane.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        {swimlane.color && (
-                          <div className="w-4 h-4 rounded" style={{ backgroundColor: swimlane.color }} />
-                        )}
-                        <span className="font-medium">{swimlane.name}</span>
-                      </div>
-                      <button
-                        onClick={() => deleteSwimlaneMutation.mutate(swimlane.id)}
-                        className="text-red-500 hover:text-red-600 text-sm"
-                      >
-                        删除
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                     </div>
+                   </>
+                 )}
               </div>
-            </div>
-          )}
+           </div>
 
-          {/* Labels Tab */}
-          {activeTab === 'labels' && (
-            <div>
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <input
-                    type="text"
-                    placeholder="标签名称"
-                    className="px-3 py-2 border rounded"
-                    id="label-name"
-                  />
-                  <input
-                    type="color"
-                    defaultValue="#3b82f6"
-                    className="w-10 h-10 rounded border"
-                    id="label-color"
-                  />
-                  <button
-                    onClick={() => {
-                      const nameInput = document.getElementById('label-name') as HTMLInputElement;
-                      const colorInput = document.getElementById('label-color') as HTMLInputElement;
-                      if (nameInput?.value.trim()) {
-                        createLabelMutation.mutate({
-                          name: nameInput.value.trim(),
-                          color: colorInput?.value || '#3b82f6',
-                        });
-                        nameInput.value = '';
-                      }
-                    }}
-                    className="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600"
-                  >
-                    添加标签
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {labels?.data?.map((label: Label) => (
-                    <div
-                      key={label.id}
-                      className="flex items-center gap-1 px-3 py-1 rounded-full text-white text-sm"
-                      style={{ backgroundColor: label.color }}
-                    >
-                      {label.name}
-                      <button
-                        onClick={() => deleteLabelMutation.mutate(label.id)}
-                        className="ml-1 hover:bg-white/20 rounded-full w-5 h-5 flex items-center justify-center"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
+           {/* Fixed Bottom Save Bar */}
+           <div className="fixed bottom-0 right-0 left-[280px] p-6 bg-gradient-to-t from-white via-white to-transparent pt-12 flex justify-end gap-3 z-20 pointer-events-none">
+              <div className="pointer-events-auto flex items-center gap-4 bg-white px-6 py-4 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.08)] border border-gray-100">
+                 <button onClick={onClose} className="text-[13px] font-bold text-gray-600 hover:text-gray-900 mr-2">Discard Changes</button>
+                 <button onClick={onClose} className="px-6 py-2.5 bg-[#0d6efd] text-white rounded-xl font-bold shadow-md hover:bg-blue-700 active:scale-95 transition-all text-sm">Save Preferences</button>
               </div>
-            </div>
-          )}
-
-          {/* Webhooks Tab */}
-          {activeTab === 'webhooks' && (
-            <div>
-              <div className="mb-4">
-                <div className="space-y-2 mb-4 p-4 bg-gray-50 rounded-lg">
-                  <input
-                    type="url"
-                    placeholder="Webhook URL"
-                    className="w-full px-3 py-2 border rounded"
-                    id="webhook-url"
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    {['card.created', 'card.updated', 'card.moved', 'card.deleted', 'card.completed'].map((event) => (
-                      <label key={event} className="flex items-center gap-1 text-sm">
-                        <input type="checkbox" value={event} className="webhook-event" />
-                        {event}
-                      </label>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => {
-                      const urlInput = document.getElementById('webhook-url') as HTMLInputElement;
-                      const checkboxes = document.querySelectorAll('.webhook-event:checked') as NodeListOf<HTMLInputElement>;
-                      const events = Array.from(checkboxes).map((cb) => cb.value as 'card.created' | 'card.updated' | 'card.moved' | 'card.deleted' | 'card.completed' | 'card.assigned' | 'comment.created' | 'checklist.completed');
-                      if (urlInput?.value.trim() && events.length > 0) {
-                        createWebhookMutation.mutate({
-                          url: urlInput.value.trim(),
-                          events,
-                        });
-                        urlInput.value = '';
-                        checkboxes.forEach((cb) => (cb.checked = false));
-                      }
-                    }}
-                    className="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600"
-                  >
-                    创建 Webhook
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {webhooks?.data?.map((webhook: Webhook) => (
-                    <div key={webhook.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <div className="font-medium text-sm truncate max-w-[300px]">{webhook.url}</div>
-                        <div className="text-xs text-gray-500">{webhook.events.join(', ')}</div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs px-2 py-1 rounded ${webhook.is_active ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
-                          {webhook.is_active ? '活跃' : '禁用'}
-                        </span>
-                        <button
-                          onClick={() => deleteWebhookMutation.mutate(webhook.id)}
-                          className="text-red-500 hover:text-red-600 text-sm"
-                        >
-                          删除
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Transition Rules Tab */}
-          {activeTab === 'rules' && (
-            <div>
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-4 p-4 bg-gray-50 rounded-lg">
-                  <select id="rule-from" className="px-3 py-2 border rounded">
-                    <option value="">从...</option>
-                    {lists.map((list: List) => (
-                      <option key={list.id} value={list.id}>{list.title}</option>
-                    ))}
-                  </select>
-                  <span>→</span>
-                  <select id="rule-to" className="px-3 py-2 border rounded">
-                    <option value="">到...</option>
-                    {lists.map((list: List) => (
-                      <option key={list.id} value={list.id}>{list.title}</option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => {
-                      const fromSelect = document.getElementById('rule-from') as HTMLSelectElement;
-                      const toSelect = document.getElementById('rule-to') as HTMLSelectElement;
-                      if (fromSelect?.value && toSelect?.value && fromSelect.value !== toSelect.value) {
-                        createRuleMutation.mutate({
-                          from_list_id: Number(fromSelect.value),
-                          to_list_id: Number(toSelect.value),
-                        });
-                      }
-                    }}
-                    className="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600"
-                  >
-                    添加规则
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {rules?.data?.map((rule: ListTransitionRule) => (
-                    <div key={rule.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="text-sm">
-                        <span className="font-medium">{rule.from_list?.title}</span>
-                        <span className="text-gray-400 mx-2">→</span>
-                        <span className="font-medium">{rule.to_list?.title}</span>
-                      </div>
-                      <button
-                        onClick={() => deleteRuleMutation.mutate(rule.id)}
-                        className="text-red-500 hover:text-red-600 text-sm"
-                      >
-                        删除
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Analytics Tab */}
-          {activeTab === 'analytics' && (
-            <AnalyticsDashboard boardId={boardId} />
-          )}
-        </div>
+           </div>
+        </main>
       </div>
     </div>
   );

@@ -6,6 +6,10 @@ import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { BoardListPage } from '@/pages/BoardListPage';
 import { BoardDetailPage } from '@/pages/BoardDetailPage';
+import { SettingsPage } from '@/pages/SettingsPage';
+import { AnalyticsPage } from '@/pages/AnalyticsPage';
+import { ProjectDetailPage } from '@/pages/ProjectDetailPage';
+import { GlobalBoardsPage } from '@/pages/GlobalBoardsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -73,6 +77,7 @@ function AppRoutes() {
           </PublicRoute>
         }
       />
+      {/* Main Routes */}
       <Route
         path="/"
         element={
@@ -82,10 +87,42 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/boards"
+        element={
+          <ProtectedRoute>
+            <GlobalBoardsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/projects/:id"
+        element={
+          <ProtectedRoute>
+            <ProjectDetailPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/boards/:id"
         element={
           <ProtectedRoute>
             <BoardDetailPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <SettingsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/analytics"
+        element={
+          <ProtectedRoute>
+            <AnalyticsPage />
           </ProtectedRoute>
         }
       />
