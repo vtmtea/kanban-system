@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { boardApi, listApi, cardApi } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
+import { CardDetailModal } from '@/components/CardDetailModal';
 import type { List, Card } from '@/types';
 
 export function BoardDetailPage() {
@@ -22,6 +23,10 @@ export function BoardDetailPage() {
   const [showAddList, setShowAddList] = useState(false);
   const [newCardTitles, setNewCardTitles] = useState<Record<number, string>>({});
   const [showAddCard, setShowAddCard] = useState<Record<number, boolean>>({});
+  const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
+  const [draggedCard, setDraggedCard] = useState<{ cardId: number; listId: number } | null>(null);
+  const [dragOverListId, setDragOverListId] = useState<number | null>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
 
   // 创建列表
   const createListMutation = useMutation({
@@ -44,6 +49,15 @@ export function BoardDetailPage() {
     },
   });
 
+  // 移动卡片
+  const moveCardMutation = useMutation({
+    mutationFn: ({ cardId, listId, position }: { cardId: number; listId: number; position?: number }) =>
+      cardApi.move(cardId, { list_id: listId, position }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['board', boardId] });
+    },
+  });
+
   const handleAddList = () => {
     if (newListTitle.trim()) {
       createListMutation.mutate(newListTitle.trim());
@@ -55,6 +69,45 @@ export function BoardDetailPage() {
     if (title?.trim()) {
       createCardMutation.mutate({ listId, title: title.trim() });
     }
+  };
+
+  // 拖拽开始
+  const handleDragStart = (e: React.DragEvent, cardId: number, listId: number) => {
+    setDraggedCard({ cardId, listId });
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', cardId.toString());
+  };
+
+  // 拖拽进入列表
+  const handleDragOver = (e: React.DragEvent, listId: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverListId(listId);
+  };
+
+  // 拖拽离开列表
+  const handleDragLeave = () => {
+    setDragOverListId(null);
+  };
+
+  // 放下卡片
+  const handleDrop = (e: React.DragEvent, targetListId: number) => {
+    e.preventDefault();
+    setDragOverListId(null);
+
+    if (draggedCard && draggedCard.listId !== targetListId) {
+      moveCardMutation.mutate({
+        cardId: draggedCard.cardId,
+        listId: targetListId,
+      });
+    }
+    setDraggedCard(null);
+  };
+
+  // 拖拽结束
+  const handleDragEnd = () => {
+    setDraggedCard(null);
+    setDragOverListId(null);
   };
 
   if (isLoading) {
@@ -101,7 +154,16 @@ export function BoardDetailPage() {
       {/* Board Content */}
       <div className="board-container">
         {boardData.lists?.map((list: List) => (
-          <div key={list.id} className="list-container">
+          <div
+            key={list.id}
+            ref={dropRef}
+            className={`list-container transition-all duration-200 ${
+              dragOverListId === list.id ? 'ring-2 ring-indigo-400 ring-offset-2' : ''
+            }`}
+            onDragOver={(e) => handleDragOver(e, list.id)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, list.id)}
+          >
             <div className="list-header">
               <span>{list.title}</span>
               <button className="text-gray-500 hover:text-gray-700">...</button>
@@ -111,9 +173,13 @@ export function BoardDetailPage() {
               {list.cards?.map((card: Card) => (
                 <div
                   key={card.id}
-                  className="card-item"
-                  // TODO: Open card detail modal
-                  onClick={() => alert('卡片详情功能待实现')}
+                  className={`card-item cursor-grab active:cursor-grabbing ${
+                    draggedCard?.cardId === card.id ? 'opacity-50 rotate-2' : ''
+                  }`}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, card.id, list.id)}
+                  onDragEnd={handleDragEnd}
+                  onClick={() => setSelectedCardId(card.id)}
                 >
                   {card.labels && card.labels.length > 0 && (
                     <div className="card-labels">
@@ -204,6 +270,15 @@ export function BoardDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Card Detail Modal */}
+      {selectedCardId && (
+        <CardDetailModal
+          cardId={selectedCardId}
+          boardId={boardId}
+          onClose={() => setSelectedCardId(null)}
+        />
+      )}
     </div>
   );
 }
