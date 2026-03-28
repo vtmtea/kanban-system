@@ -1,0 +1,110 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'backend/**'
+      - 'openapi.yaml'
+      - '.github/workflows/backend.yml'
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'backend/**'
+      - 'openapi.yaml'
+      - '.github/workflows/backend.yml'
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.24'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: backend/go.sum
+
+      - name: Install oapi-codegen
+        run: go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
+
+      - name: Generate API types
+        working-directory: backend
+        run: ~/go/bin/oapi-codegen -config oapi-codegen.yaml ../openapi.yaml
+
+      - name: Download dependencies
+        working-directory: backend
+        run: go mod download
+
+      - name: Build
+        working-directory: backend
+        run: CGO_ENABLED=0 GOOS=linux go build -o kanban-backend ./cmd/server
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-binary
+          path: backend/kanban-backend
+          retention-days: 1
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-binary
+          path: ./backend
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p ${{ secrets.SERVER_PORT || 22 }} ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Create deployment directory
+        run: |
+          ssh -p ${{ secrets.SERVER_PORT || 22 }} ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
+            "mkdir -p ${{ secrets.DEPLOY_PATH || '/opt/kanban' }}/backend"
+
+      - name: Deploy binary
+        run: |
+          scp -P ${{ secrets.SERVER_PORT || 22 }} ./backend/kanban-backend \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.DEPLOY_PATH || '/opt/kanban' }}/backend/kanban-backend
+
+      - name: Deploy config files
+        run: |
+          scp -P ${{ secrets.SERVER_PORT || 22 }} backend/.env.example \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.DEPLOY_PATH || '/opt/kanban' }}/backend/.env.example
+
+      - name: Set permissions and restart service
+        run: |
+          ssh -p ${{ secrets.SERVER_PORT || 22 }} ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+            chmod +x ${{ secrets.DEPLOY_PATH || '/opt/kanban' }}/backend/kanban-backend
+
+            # Try to restart the service (if systemd service exists)
+            if systemctl is-active --quiet kanban-backend; then
+              sudo systemctl restart kanban-backend
+              echo "Service restarted via systemctl"
+            else
+              echo "No systemd service found. Please restart manually or create a service."
+            fi
+          EOF
+
+      - name: Cleanup SSH
+        if: always()
+        run: rm -f ~/.ssh/id_rsa

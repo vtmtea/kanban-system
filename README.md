@@ -23,9 +23,11 @@
 
 ```
 kanban-system/
+├── .github/workflows/ # GitHub Actions CI/CD
 ├── backend/           # Golang 后端
 │   ├── cmd/server/    # 入口文件
 │   ├── internal/
+│   │   ├── api/       # 生成的 API 类型
 │   │   ├── config/    # 配置管理
 │   │   ├── models/    # 数据模型
 │   │   ├── handlers/  # HTTP 处理器
@@ -39,10 +41,14 @@ kanban-system/
 │   │   ├── pages/
 │   │   ├── hooks/
 │   │   ├── services/
-│   │   ├── types/
+│   │   ├── types/     # 生成的 API 类型
 │   │   ├── context/
 │   │   └── utils/
 │   └── Dockerfile
+├── deploy/            # 部署配置
+│   ├── kanban-backend.service
+│   └── nginx.conf
+├── openapi.yaml       # API 规范 (API First)
 └── docker-compose.yml # Docker 编排
 ```
 
@@ -163,6 +169,42 @@ docker run -d \
 | SERVER_PORT | 服务端口 | 8080 |
 | JWT_SECRET | JWT 密钥 | (生产环境需修改) |
 | JWT_EXPIRY | JWT 有效期 | 24h |
+
+## API First 开发
+
+项目采用 API First 开发模式，所有 API 规范定义在 `openapi.yaml` 中。
+
+### 生成代码
+
+```bash
+# 后端 - 生成 Go 类型
+cd backend
+~/go/bin/oapi-codegen -config oapi-codegen.yaml ../openapi.yaml
+
+# 前端 - 生成 TypeScript 类型
+cd frontend
+pnpm run generate:api
+```
+
+### 修改 API
+
+1. 编辑 `openapi.yaml`
+2. 重新生成后端和前端类型
+3. 更新 handlers 和 API 服务代码
+
+## CI/CD 部署
+
+项目使用 GitHub Actions 实现自动化部署，前端后端分开部署。
+
+详细部署指南请参考 [deploy/README.md](deploy/README.md)。
+
+### 快速配置
+
+在 GitHub 仓库 Settings -> Secrets 中添加：
+
+- `SERVER_HOST` - 服务器地址
+- `SERVER_USER` - SSH 用户名
+- `SERVER_SSH_KEY` - SSH 私钥
 
 ## License
 

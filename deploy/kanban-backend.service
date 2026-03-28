@@ -1,0 +1,21 @@
+[Unit]
+Description=Kanban Backend API Server
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/kanban/backend
+ExecStart=/opt/kanban/backend/kanban-backend
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=GIN_MODE=release
+
+# Environment variables (copy from .env.example and modify)
+EnvironmentFile=/opt/kanban/backend/.env
+
+[Install]
+WantedBy=multi-user.target
