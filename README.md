@@ -74,7 +74,13 @@ cp .env.example .env
 # 安装依赖
 go mod download
 
-# 运行
+# 安装 Air (热重载工具)
+go install github.com/air-verse/air@latest
+
+# 使用热重载运行 (推荐)
+air
+
+# 或者普通运行
 go run cmd/server/main.go
 ```
 
