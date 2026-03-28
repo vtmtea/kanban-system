@@ -69,42 +69,22 @@ jobs:
           name: backend-binary
           path: ./backend
 
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -p ${{ secrets.SERVER_PORT || 22 }} ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Create deployment directory
-        run: |
-          ssh -p ${{ secrets.SERVER_PORT || 22 }} ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
-            "mkdir -p ${{ secrets.DEPLOY_PATH || '/opt/kanban' }}/backend"
-
-      - name: Deploy binary
-        run: |
-          scp -P ${{ secrets.SERVER_PORT || 22 }} ./backend/kanban-backend \
-            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.DEPLOY_PATH || '/opt/kanban' }}/backend/kanban-backend
-
-      - name: Deploy config files
-        run: |
-          scp -P ${{ secrets.SERVER_PORT || 22 }} backend/.env.example \
-            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.DEPLOY_PATH || '/opt/kanban' }}/backend/.env.example
-
-      - name: Set permissions and restart service
-        run: |
-          ssh -p ${{ secrets.SERVER_PORT || 22 }} ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+      - name: Deploy backend binary
+        uses: easingthemes/ssh-deploy@main
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          REMOTE_HOST: ${{ secrets.SERVER_HOST }}
+          REMOTE_USER: ${{ secrets.SERVER_USER }}
+          REMOTE_PORT: ${{ secrets.SERVER_PORT || 22 }}
+          SOURCE: ./backend/kanban-backend
+          TARGET: ${{ secrets.DEPLOY_PATH || '/opt/kanban' }}/backend
+          ARGS: "-rltgoDzvO --exclude='.env'"
+          SCRIPT_AFTER: |
             chmod +x ${{ secrets.DEPLOY_PATH || '/opt/kanban' }}/backend/kanban-backend
-
-            # Try to restart the service (if systemd service exists)
             if systemctl is-active --quiet kanban-api; then
               sudo systemctl restart kanban-api
               echo "Service restarted via systemctl"
             else
               echo "No systemd service found. Please restart manually or create a service."
             fi
-          EOF
-
-      - name: Cleanup SSH
-        if: always()
-        run: rm -f ~/.ssh/id_rsa
+          SCRIPT_AFTER_REQUIRED: true

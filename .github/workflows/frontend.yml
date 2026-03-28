@@ -72,26 +72,13 @@ jobs:
           name: frontend-dist
           path: ./dist
 
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -p ${{ secrets.SERVER_PORT || 22 }} ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Create deployment directory
-        run: |
-          ssh -p ${{ secrets.SERVER_PORT || 22 }} ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
-            "mkdir -p ${{ secrets.FRONTEND_DEPLOY_PATH || '/var/www/kanban' }}"
-
       - name: Deploy frontend
-        run: |
-          ssh -p ${{ secrets.SERVER_PORT || 22 }} ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
-            "rm -rf ${{ secrets.FRONTEND_DEPLOY_PATH || '/var/www/kanban' }}/*"
-
-          scp -P ${{ secrets.SERVER_PORT || 22 }} -r ./dist/* \
-            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.FRONTEND_DEPLOY_PATH || '/var/www/kanban' }}/
-
-      - name: Cleanup SSH
-        if: always()
-        run: rm -f ~/.ssh/id_rsa
+        uses: easingthemes/ssh-deploy@main
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          REMOTE_HOST: ${{ secrets.SERVER_HOST }}
+          REMOTE_USER: ${{ secrets.SERVER_USER }}
+          REMOTE_PORT: ${{ secrets.SERVER_PORT || 22 }}
+          SOURCE: ./dist/
+          TARGET: ${{ secrets.FRONTEND_DEPLOY_PATH || '/var/www/kanban' }}
+          ARGS: -rltgoDzvO --delete
