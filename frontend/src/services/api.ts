@@ -6,19 +6,43 @@ import type {
   Card,
   Comment,
   Label,
+  Swimlane,
+  ChecklistItem,
+  Attachment,
+  ActivityListResponse,
+  BoardMember,
+  ListWipStatus,
+  ListAutoAssignment,
+  ListTransitionRule,
+  Webhook,
+  CFDResponse,
+  CycleTimeResponse,
+  ThroughputResponse,
   LoginRequest,
   LoginResponse,
   RegisterRequest,
   UpdateUserRequest,
   CreateBoardRequest,
   UpdateBoardRequest,
+  CreateSwimlaneRequest,
+  UpdateSwimlaneRequest,
   CreateListRequest,
   UpdateListRequest,
   CreateCardRequest,
   UpdateCardRequest,
   MoveCardRequest,
+  AssignCardRequest,
+  CreateChecklistItemRequest,
+  UpdateChecklistItemRequest,
   CreateCommentRequest,
   CreateLabelRequest,
+  UpdateLabelRequest,
+  AddBoardMemberRequest,
+  UpdateMemberRoleRequest,
+  SetAutoAssignmentRequest,
+  CreateTransitionRuleRequest,
+  CreateWebhookRequest,
+  UpdateWebhookRequest,
 } from '@/types';
 
 // 动态获取 API 基础路径
@@ -68,6 +92,34 @@ export const boardApi = {
   create: (data: CreateBoardRequest) => api.post<Board>('/boards', data),
   update: (id: number, data: UpdateBoardRequest) => api.put<Board>(`/boards/${id}`, data),
   delete: (id: number) => api.delete(`/boards/${id}`),
+  getWipStatus: (id: number) => api.get<ListWipStatus[]>(`/boards/${id}/wip-status`),
+  getMembers: (id: number) => api.get<BoardMember[]>(`/boards/${id}/members`),
+  addMember: (id: number, data: AddBoardMemberRequest) => api.post<BoardMember>(`/boards/${id}/members`, data),
+  updateMemberRole: (id: number, userId: number, data: UpdateMemberRoleRequest) =>
+    api.put<BoardMember>(`/boards/${id}/members/${userId}`, data),
+  removeMember: (id: number, userId: number) => api.delete(`/boards/${id}/members/${userId}`),
+  getActivities: (id: number, params?: { page?: number; limit?: number; entity_type?: string; action?: string }) =>
+    api.get<ActivityListResponse>(`/boards/${id}/activities`, { params }),
+  getWebhooks: (id: number) => api.get<Webhook[]>(`/boards/${id}/webhooks`),
+  createWebhook: (id: number, data: CreateWebhookRequest) => api.post<Webhook>(`/boards/${id}/webhooks`, data),
+  getTransitionRules: (id: number) => api.get<ListTransitionRule[]>(`/boards/${id}/transition-rules`),
+  createTransitionRule: (id: number, data: CreateTransitionRuleRequest) =>
+    api.post<ListTransitionRule>(`/boards/${id}/transition-rules`, data),
+  // Analytics
+  getCFD: (id: number, params?: { start_date?: string; end_date?: string }) =>
+    api.get<CFDResponse>(`/boards/${id}/analytics/cfd`, { params }),
+  getCycleTime: (id: number, params?: { start_date?: string; end_date?: string }) =>
+    api.get<CycleTimeResponse>(`/boards/${id}/analytics/cycle-time`, { params }),
+  getThroughput: (id: number, params?: { start_date?: string; end_date?: string }) =>
+    api.get<ThroughputResponse>(`/boards/${id}/analytics/throughput`, { params }),
+};
+
+// 泳道相关
+export const swimlaneApi = {
+  getAll: (boardId: number) => api.get<Swimlane[]>(`/boards/${boardId}/swimlanes`),
+  create: (boardId: number, data: CreateSwimlaneRequest) => api.post<Swimlane>(`/boards/${boardId}/swimlanes`, data),
+  update: (id: number, data: UpdateSwimlaneRequest) => api.put<Swimlane>(`/swimlanes/${id}`, data),
+  delete: (id: number) => api.delete(`/swimlanes/${id}`),
 };
 
 // 列表相关
@@ -76,6 +128,10 @@ export const listApi = {
   create: (boardId: number, data: CreateListRequest) => api.post<List>(`/boards/${boardId}/lists`, data),
   update: (id: number, data: UpdateListRequest) => api.put<List>(`/lists/${id}`, data),
   delete: (id: number) => api.delete(`/lists/${id}`),
+  getAutoAssignments: (id: number) => api.get<ListAutoAssignment[]>(`/lists/${id}/auto-assignments`),
+  setAutoAssignment: (id: number, data: SetAutoAssignmentRequest) =>
+    api.post<ListAutoAssignment>(`/lists/${id}/auto-assignments`, data),
+  deleteAutoAssignment: (id: number) => api.delete(`/lists/${id}/auto-assignments`),
 };
 
 // 卡片相关
@@ -87,6 +143,25 @@ export const cardApi = {
   delete: (id: number) => api.delete(`/cards/${id}`),
   addLabel: (cardId: number, labelId: number) => api.post(`/cards/${cardId}/labels/${labelId}`),
   removeLabel: (cardId: number, labelId: number) => api.delete(`/cards/${cardId}/labels/${labelId}`),
+  complete: (id: number) => api.put<Card>(`/cards/${id}/complete`),
+  assign: (id: number, data: AssignCardRequest) => api.put<Card>(`/cards/${id}/assign`, data),
+  // Checklist
+  getChecklist: (id: number) => api.get<ChecklistItem[]>(`/cards/${id}/checklist`),
+  addChecklistItem: (id: number, data: CreateChecklistItemRequest) =>
+    api.post<ChecklistItem>(`/cards/${id}/checklist`, data),
+  updateChecklistItem: (id: number, data: UpdateChecklistItemRequest) =>
+    api.put<ChecklistItem>(`/checklist/${id}`, data),
+  deleteChecklistItem: (id: number) => api.delete(`/checklist/${id}`),
+  // Attachments
+  getAttachments: (id: number) => api.get<Attachment[]>(`/cards/${id}/attachments`),
+  uploadAttachment: (id: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<Attachment>(`/cards/${id}/attachments`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  deleteAttachment: (id: number) => api.delete(`/attachments/${id}`),
 };
 
 // 评论相关
@@ -100,7 +175,24 @@ export const commentApi = {
 export const labelApi = {
   getAll: (boardId: number) => api.get<Label[]>(`/boards/${boardId}/labels`),
   create: (boardId: number, data: CreateLabelRequest) => api.post<Label>(`/boards/${boardId}/labels`, data),
+  update: (id: number, data: UpdateLabelRequest) => api.put<Label>(`/labels/${id}`, data),
   delete: (id: number) => api.delete(`/labels/${id}`),
+};
+
+// Webhook相关
+export const webhookApi = {
+  getAll: (boardId: number) => api.get<Webhook[]>(`/boards/${boardId}/webhooks`),
+  create: (boardId: number, data: CreateWebhookRequest) => api.post<Webhook>(`/boards/${boardId}/webhooks`, data),
+  update: (id: number, data: UpdateWebhookRequest) => api.put<Webhook>(`/webhooks/${id}`, data),
+  delete: (id: number) => api.delete(`/webhooks/${id}`),
+};
+
+// 状态转移规则相关
+export const transitionRuleApi = {
+  getAll: (boardId: number) => api.get<ListTransitionRule[]>(`/boards/${boardId}/transition-rules`),
+  create: (boardId: number, data: CreateTransitionRuleRequest) =>
+    api.post<ListTransitionRule>(`/boards/${boardId}/transition-rules`, data),
+  delete: (id: number) => api.delete(`/transition-rules/${id}`),
 };
 
 export default api;
