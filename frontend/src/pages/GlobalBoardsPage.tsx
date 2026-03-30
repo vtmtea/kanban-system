@@ -1,76 +1,27 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 
 export function GlobalBoardsPage() {
-  // Sidebar Icons
-  const FolderIcon = () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>;
-  const LayoutIcon = () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13h16M12 5v14" /></svg>;
-  const ChartBarIcon = () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002-2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>;
-  const CogIcon = () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
+  const { logout } = useAuth();
+  const navigate = useNavigate();
 
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  // Sidebar Icons
+          
   return (
     <div className="flex h-screen bg-[#f8fafc] font-sans antialiased text-gray-800">
       {/* Sidebar */}
-      <aside className="w-64 bg-[#f8fafc] flex flex-col justify-between hidden md:flex border-r border-gray-100 shrink-0">
-        <div>
-          <div className="p-6 flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#0d6efd] rounded-lg flex items-center justify-center shadow-md">
-              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="font-extrabold text-gray-900 leading-none text-lg">Workspace</h2>
-              <p className="text-[10px] text-gray-500 font-bold tracking-widest mt-1 uppercase">High Performance Team</p>
-            </div>
-          </div>
-
-          <nav className="px-4 space-y-1 mt-2">
-            <Link to="/" className="w-full flex items-center gap-3 px-3 py-2.5 text-gray-500 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors">
-               <FolderIcon /> Projects
-            </Link>
-            <Link to="/boards" className="w-full flex items-center gap-3 px-3 py-2.5 bg-white text-[#0d6efd] rounded-lg shadow-sm text-sm font-semibold border border-gray-100 transition-colors">
-              <LayoutIcon /> Boards
-            </Link>
-            <Link to="/analytics" className="w-full flex items-center gap-3 px-3 py-2.5 text-gray-500 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors">
-              <ChartBarIcon /> Analytics
-            </Link>
-            <Link to="/settings" className="w-full flex items-center gap-3 px-3 py-2.5 text-gray-500 hover:bg-gray-100 rounded-lg text-sm font-medium mt-6 transition-colors">
-              <CogIcon /> Settings
-            </Link>
-          </nav>
-        </div>
-      </aside>
+      <Sidebar activePage="boards" />
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden relative bg-[#fdfdfd] md:rounded-tl-[2.5rem] md:rounded-bl-[2.5rem] border-y border-l border-gray-100/80 shadow-[-8px_0_32px_rgba(0,0,0,0.02)] isolate">
         
         {/* Top Navbar */}
-        <header className="h-20 flex items-center justify-between px-10 border-b border-gray-100 bg-white shrink-0 z-10 w-full animate-slide-up-fade">
-           <div className="flex items-center gap-4">
-              <h1 className="text-[18px] font-extrabold text-gray-900 tracking-tight">Kinetic Workspace</h1>
-           </div>
-           
-           <div className="flex-1 max-w-lg relative mx-8">
-              <svg className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input type="text" placeholder="Search boards, tasks..." className="w-full bg-[#f4f6f8] border-none rounded-xl py-2 pl-11 pr-4 text-[13px] font-semibold text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-[#0d6efd]/30 outline-none transition-shadow" />
-           </div>
-           
-           <div className="flex items-center gap-4">
-              <button className="text-gray-400 hover:text-gray-600 relative p-2 transition-colors">
-                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-                 <div className="w-2.5 h-2.5 bg-[#0d6efd] rounded-full border-2 border-white absolute top-1.5 right-1.5"></div>
-              </button>
-              <button className="text-gray-400 hover:text-gray-600 p-2 transition-colors">
-                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
-              </button>
-              <button className="bg-[#0d6efd] text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 transition-colors ml-2">CREATE</button>
-              <div className="w-9 h-9 rounded-full bg-gray-800 shadow-sm overflow-hidden flex items-center justify-center ring-2 ring-gray-100 cursor-pointer ml-3">
-                 <img src="https://i.pravatar.cc/150?img=50" className="w-full h-full object-cover" alt="Profile" />
-              </div>
-           </div>
-        </header>
+        <TopNav title="Active Boards" />
 
         {/* Board List Content */}
         <div className="flex-1 overflow-y-auto w-full pb-32 xl:flex xl:justify-center bg-[#fdfdfd] custom-scrollbar">

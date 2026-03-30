@@ -11,8 +11,10 @@
     "generate:api": "openapi-typescript ../openapi.yaml -o src/types/api.ts"
   },
   "dependencies": {
+    "@gsap/react": "^2.1.2",
     "@tanstack/react-query": "^5.17.0",
     "axios": "^1.6.5",
+    "gsap": "^3.14.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-markdown": "^10.1.0",

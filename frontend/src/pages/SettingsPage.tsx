@@ -5,11 +5,7 @@ export function SettingsPage() {
   const [activeSection, setActiveSection] = useState('profile');
 
   // Svg icons for Global Sidebar
-  const FolderIcon = () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>;
-  const LayoutIcon = () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13h16M12 5v14" /></svg>;
-  const ChartBarIcon = () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>;
-  const CogIcon = () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
-
+        
   const scrollToSection = (id: string) => {
     setActiveSection(id);
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
@@ -18,57 +14,13 @@ export function SettingsPage() {
   return (
     <div className="flex h-screen bg-[#f8fafc] font-sans antialiased text-gray-800 animate-slide-up-fade">
       {/* Global Sidebar */}
-      <aside className="w-64 bg-[#f8fafc] flex flex-col justify-between hidden md:flex border-r border-gray-100 z-20 shrink-0">
-        <div>
-          {/* Logo */}
-          <div className="p-6 flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#0d6efd] rounded-lg flex items-center justify-center shadow-md">
-              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-              </svg>
-            </div>
-            <div>
-              <h2 className="font-extrabold text-gray-900 leading-none text-lg">Workspace</h2>
-              <p className="text-[10px] text-gray-500 font-bold tracking-widest mt-1">HIGH PERFORMANCE TEAM</p>
-            </div>
-          </div>
-
-          {/* Global Navigation */}
-          <nav className="px-4 space-y-1 mt-2">
-            <Link to="/" className="flex items-center gap-3 px-3 py-2.5 text-gray-500 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors">
-              <FolderIcon /> Projects
-            </Link>
-            <Link to="/boards" className="flex items-center gap-3 px-3 py-2.5 text-gray-500 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors">
-              <LayoutIcon /> Boards
-            </Link>
-            <Link to="/analytics" className="flex items-center gap-3 px-3 py-2.5 text-gray-500 hover:bg-gray-100 rounded-lg text-sm font-medium transition-colors">
-              <ChartBarIcon /> Analytics
-            </Link>
-            <Link to="/settings" className="flex items-center gap-3 px-3 py-2.5 bg-white text-[#0d6efd] rounded-lg shadow-sm text-sm font-semibold border border-gray-100 mt-6">
-              <CogIcon /> Settings
-            </Link>
-          </nav>
-        </div>
-      </aside>
+      <Sidebar activePage="settings" />
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col relative bg-white">
         
         {/* Top Navbar */}
-        <header className="h-[72px] flex items-center justify-between px-10 border-b border-gray-100 bg-white shrink-0">
-           <div className="flex items-end h-full pt-4">
-             <span className="text-gray-900 font-bold text-xl pb-4">Global Settings</span>
-           </div>
-           
-           <div className="flex items-center gap-4">
-              <button className="text-gray-400 hover:text-gray-600">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-              </button>
-              <div className="w-8 h-8 rounded-full bg-indigo-500 ml-2 overflow-hidden flex items-center justify-center text-white font-bold text-sm shadow-sm cursor-pointer">
-                 A
-              </div>
-           </div>
-        </header>
+        <TopNav title="Settings" />
 
         {/* Global Settings Split Pane Wrapper */}
         <div className="flex flex-1 overflow-hidden bg-[#fbfcfd]">
