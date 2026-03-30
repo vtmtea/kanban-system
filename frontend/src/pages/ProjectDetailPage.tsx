@@ -1,10 +1,8 @@
-import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { Sidebar } from '@/components/Sidebar';
+import { TopNav } from '@/components/TopNav';
 
 export function ProjectDetailPage() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-
   // Sidebar Icons
           
   return (

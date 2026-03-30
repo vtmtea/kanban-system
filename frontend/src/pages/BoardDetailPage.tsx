@@ -1,18 +1,17 @@
-import { useState, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { boardApi, listApi, cardApi, swimlaneApi } from '@/services/api';
-import { useAuth } from '@/context/AuthContext';
+import { boardApi, listApi, cardApi } from '@/services/api';
 import { CardDetailModal } from '@/components/CardDetailModal';
 import { BoardSettingsModal } from '@/components/BoardSettingsModal';
 import { ActivitySidebar } from '@/components/ActivitySidebar';
+import { Sidebar } from '@/components/Sidebar';
+import { TopNav } from '@/components/TopNav';
 import { useWebSocket } from '@/hooks/useWebSocket';
-import type { List, Card, Swimlane } from '@/types';
+import type { List, Card } from '@/types';
 
 export function BoardDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const boardId = Number(id);
@@ -22,7 +21,7 @@ export function BoardDetailPage() {
     queryFn: () => boardApi.getOne(boardId),
   });
 
-  const { data: wipStatus } = useQuery({
+  useQuery({
     queryKey: ['board', boardId, 'wip-status'],
     queryFn: () => boardApi.getWipStatus(boardId),
     enabled: !!board?.data,

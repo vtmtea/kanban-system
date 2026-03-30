@@ -1,15 +1,8 @@
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
+import { Link } from 'react-router-dom';
+import { Sidebar } from '@/components/Sidebar';
+import { TopNav } from '@/components/TopNav';
 
 export function GlobalBoardsPage() {
-  const { logout } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
   // Sidebar Icons
           
   return (
@@ -205,13 +198,13 @@ export function GlobalBoardsPage() {
                  </Link>
 
                  {/* Card 5: Start New Project */}
-                 <div className="bg-[#fcfcfd] rounded-[1.5rem] border-2 border-dashed border-gray-200 hover:border-[#0d6efd] hover:bg-blue-50/20 p-8 flex flex-col items-center justify-center min-h-[260px] cursor-pointer group transition-all duration-300">
+                 <Link to="/projects/new" className="bg-[#fcfcfd] rounded-[1.5rem] border-2 border-dashed border-gray-200 hover:border-[#0d6efd] hover:bg-blue-50/20 p-8 flex flex-col items-center justify-center min-h-[260px] cursor-pointer group transition-all duration-300">
                     <div className="w-14 h-14 rounded-2xl bg-gray-100 text-gray-500 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-[#0d6efd] group-hover:text-white transition-all shadow-sm">
                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
                     </div>
                     <h3 className="text-[16px] font-bold text-gray-900 mb-2">Start New Project</h3>
                     <p className="text-[12px] text-gray-400 font-medium text-center">Clone from templates or start blank</p>
-                 </div>
+                 </Link>
 
               </div>
 

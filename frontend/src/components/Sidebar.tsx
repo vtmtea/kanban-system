@@ -11,7 +11,7 @@ export const CogIcon = () => <svg className="w-5 h-5" fill="none" viewBox="0 0 2
 export const LogoutIcon = () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>;
 
 export function Sidebar({ activePage }: { activePage: string }) {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -20,53 +20,70 @@ export function Sidebar({ activePage }: { activePage: string }) {
   };
 
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', path: '#', icon: <DashboardIcon /> },
-    { id: 'projects', label: 'Projects', path: '/', icon: <FolderIcon /> },
+    { id: 'dashboard', label: 'Dashboard', path: '/', icon: <DashboardIcon /> },
+    { id: 'projects', label: 'Projects', path: '/projects', icon: <FolderIcon /> },
     { id: 'boards', label: 'Active Boards', path: '/boards', icon: <LayoutIcon /> },
     { id: 'analytics', label: 'Analytics', path: '/analytics', icon: <ChartBarIcon /> },
-    { id: 'team', label: 'Team', path: '#', icon: <UsersIcon /> },
+    { id: 'team', label: 'Team', path: '/team', icon: <UsersIcon /> },
     { id: 'settings', label: 'Settings', path: '/settings', icon: <CogIcon /> },
   ];
 
+  const displayName = user?.nickname || user?.username || 'Alex Chen';
+  const displayRole = user?.email || 'Team Lead';
+  const avatarUrl = user?.avatar || 'https://i.pravatar.cc/150?img=11';
+
   return (
-    <aside className="w-[260px] bg-[#f8fafc] flex flex-col justify-between hidden md:flex shrink-0 h-screen border-r border-[#e2e8f0]/40">
-      <div>
-        <div className="p-8 pb-6 mb-2">
-          <h2 className="font-extrabold text-[#111827] leading-none text-[22px] tracking-tight">Kinetic</h2>
-          <p className="text-[10px] text-gray-400 font-bold tracking-widest mt-1 uppercase leading-none">Workspace</p>
+    <aside className="hidden h-screen w-[320px] shrink-0 flex-col border-r border-[#d9e3ef] bg-[#f3f7fc] md:flex">
+      <div className="flex-1 px-6 pt-8">
+        <div className="px-4 pb-12">
+          <h2 className="text-[22px] font-extrabold leading-none tracking-tight text-[#111827]">Kinetic</h2>
+          <p className="mt-2 text-[10px] font-extrabold uppercase tracking-[0.22em] text-[#64748b]">Workspace</p>
         </div>
 
-        <nav className="px-5 space-y-1.5 mt-2 flex flex-col">
+        <nav className="flex flex-col gap-1.5">
           {navItems.map(item => {
-             const isActive = activePage === item.id;
-             return (
-               <Link 
-                 key={item.id} 
-                 to={item.path} 
-                 className={`w-full flex items-center gap-3.5 px-4 py-2.5 rounded-xl text-[14px] font-semibold transition-all ${isActive ? 'bg-white text-[#0d6efd] shadow-[0_2px_8px_rgba(0,0,0,0.03)] border border-gray-100/50' : 'text-gray-500 hover:bg-gray-100/80 hover:text-gray-900'}`}
-               >
-                 <span className={`flex items-center justify-center ${isActive ? 'text-[#0d6efd]' : 'text-gray-400'}`}>
-                   {item.icon}
-                 </span>
-                 {item.label}
-               </Link>
-             );
+            const isActive = activePage === item.id;
+            const className = `flex w-full items-center gap-4 rounded-2xl px-4 py-3 text-[15px] font-semibold transition-all ${
+              isActive
+                ? 'border border-white/90 bg-white text-[#0f4fe6] shadow-[0_10px_30px_rgba(15,79,230,0.08)]'
+                : 'text-[#40526d] hover:bg-white/70 hover:text-[#111827]'
+            }`;
+            const iconClassName = isActive ? 'text-[#0f4fe6]' : 'text-[#5f718b]';
+
+            if (!item.path) {
+              return (
+                <div key={item.id} className={`${className} cursor-default`}>
+                  <span className={iconClassName}>{item.icon}</span>
+                  <span>{item.label}</span>
+                </div>
+              );
+            }
+
+            return (
+              <Link key={item.id} to={item.path} className={className}>
+                <span className={iconClassName}>{item.icon}</span>
+                <span>{item.label}</span>
+              </Link>
+            );
           })}
         </nav>
       </div>
 
-      <div>
-        <div className="px-5 mb-4 border-t border-gray-200/50 pt-4 pb-2 mx-5">
-           <div className="flex items-center gap-3">
-             <img src="https://i.pravatar.cc/150?img=11" className="w-[38px] h-[38px] rounded-full bg-gray-200 shadow-sm" alt="User" />
-             <div className="flex-1 overflow-hidden">
-               <h4 className="text-[13px] font-extrabold text-gray-900 truncate">Alex Chen</h4>
-               <p className="text-[11px] font-semibold text-gray-400 truncate">Team Lead</p>
-             </div>
-           </div>
+      <div className="px-5 pb-7">
+        <div className="border-t border-[#d5dfec] px-1 pt-7">
+          <div className="flex items-center gap-3 rounded-2xl px-3 py-2.5">
+            <img src={avatarUrl} className="h-12 w-12 rounded-2xl border border-white object-cover shadow-sm" alt={displayName} />
+            <div className="min-w-0 flex-1">
+              <h4 className="truncate text-[14px] font-extrabold text-[#111827]">{displayName}</h4>
+              <p className="truncate text-[12px] font-medium text-[#6b7b90]">{displayRole}</p>
+            </div>
+          </div>
         </div>
-        <div className="px-5 pb-6">
-          <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-gray-400 hover:bg-red-50 hover:text-red-500 rounded-xl text-[13px] font-bold transition-colors">
+        <div className="mt-3 px-1">
+          <button
+            onClick={handleLogout}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[13px] font-bold text-[#6b7b90] transition-colors hover:bg-red-50 hover:text-red-500"
+          >
             <LogoutIcon /> Logout
           </button>
         </div>

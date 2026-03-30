@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { boardApi } from '@/services/api';
+import { DatePickerField } from '@/components/DatePickerField';
 import type { CFDDataPoint, CFDResponse, CycleTimeResponse, ThroughputResponse } from '@/types';
 
 interface AnalyticsDashboardProps {
@@ -89,20 +90,18 @@ export function AnalyticsDashboard({ boardId }: AnalyticsDashboardProps) {
       <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
         <div className="flex items-center gap-2">
           <label className="text-sm text-gray-600">开始日期:</label>
-          <input
-            type="date"
+          <DatePickerField
             value={dateRange.start_date}
-            onChange={(e) => setDateRange({ ...dateRange, start_date: e.target.value })}
-            className="px-2 py-1 border rounded text-sm"
+            onChange={(nextValue) => setDateRange({ ...dateRange, start_date: nextValue })}
+            size="sm"
           />
         </div>
         <div className="flex items-center gap-2">
           <label className="text-sm text-gray-600">结束日期:</label>
-          <input
-            type="date"
+          <DatePickerField
             value={dateRange.end_date}
-            onChange={(e) => setDateRange({ ...dateRange, end_date: e.target.value })}
-            className="px-2 py-1 border rounded text-sm"
+            onChange={(nextValue) => setDateRange({ ...dateRange, end_date: nextValue })}
+            size="sm"
           />
         </div>
       </div>

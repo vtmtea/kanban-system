@@ -4,12 +4,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
+import { DashboardPage } from '@/pages/DashboardPage';
 import { BoardListPage } from '@/pages/BoardListPage';
 import { BoardDetailPage } from '@/pages/BoardDetailPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { AnalyticsPage } from '@/pages/AnalyticsPage';
+import { TeamPage } from '@/pages/TeamPage';
 import { ProjectDetailPage } from '@/pages/ProjectDetailPage';
 import { GlobalBoardsPage } from '@/pages/GlobalBoardsPage';
+import { CreateProjectPage } from '@/pages/CreateProjectPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -82,7 +85,23 @@ function AppRoutes() {
         path="/"
         element={
           <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/projects"
+        element={
+          <ProtectedRoute>
             <BoardListPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/projects/new"
+        element={
+          <ProtectedRoute>
+            <CreateProjectPage />
           </ProtectedRoute>
         }
       />
@@ -123,6 +142,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <AnalyticsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/team"
+        element={
+          <ProtectedRoute>
+            <TeamPage />
           </ProtectedRoute>
         }
       />

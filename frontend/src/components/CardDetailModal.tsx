@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { cardApi, commentApi, labelApi, boardApi } from '@/services/api';
+import { cardApi, commentApi } from '@/services/api';
 import { MarkdownEditor, MarkdownRenderer } from '@/components/MarkdownEditor';
-import type { Card, Comment, Label, ChecklistItem, Attachment, User } from '@/types';
+import type { Card, Comment, ChecklistItem, Attachment } from '@/types';
 
 interface CardDetailModalProps {
   cardId: number;
@@ -26,10 +26,8 @@ export function CardDetailModal({ cardId, boardId, onClose, onDelete }: CardDeta
   // Queries
   const { data: cardData } = useQuery({ queryKey: ['card', cardId], queryFn: () => cardApi.getOne(cardId) });
   const { data: commentsData } = useQuery({ queryKey: ['comments', cardId], queryFn: () => commentApi.getAll(cardId) });
-  const { data: labelsData } = useQuery({ queryKey: ['labels', boardId], queryFn: () => labelApi.getAll(boardId) });
   const { data: checklistData } = useQuery({ queryKey: ['checklist', cardId], queryFn: () => cardApi.getChecklist(cardId) });
   const { data: attachmentsData } = useQuery({ queryKey: ['attachments', cardId], queryFn: () => cardApi.getAttachments(cardId) });
-  const { data: membersData } = useQuery({ queryKey: ['board', boardId, 'members'], queryFn: () => boardApi.getMembers(boardId) });
 
   // Mutations
   const updateCardMutation = useMutation({
@@ -39,14 +37,6 @@ export function CardDetailModal({ cardId, boardId, onClose, onDelete }: CardDeta
       queryClient.invalidateQueries({ queryKey: ['board', boardId] });
       setIsEditingTitle(false);
       setIsEditingDesc(false);
-    },
-  });
-
-  const assignCardMutation = useMutation({
-    mutationFn: (assigneeId: number | null) => cardApi.assign(cardId, { assignee_id: assigneeId }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['card', cardId] });
-      queryClient.invalidateQueries({ queryKey: ['board', boardId] });
     },
   });
 
@@ -94,7 +84,6 @@ export function CardDetailModal({ cardId, boardId, onClose, onDelete }: CardDeta
   const comments = commentsData?.data as Comment[] | undefined;
   const checklistItems = checklistData?.data as ChecklistItem[] | undefined;
   const attachments = attachmentsData?.data as Attachment[] | undefined;
-  const members = membersData?.data as { user_id: number; user?: User; role: string }[] | undefined;
 
   // Initialize title when card is loaded
   useEffect(() => {

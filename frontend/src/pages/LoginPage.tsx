@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { authApi } from '@/services/api';
 import type { LoginRequest } from '@/types';
-import { useEffect } from 'react';
 import { AnimatedCharacters } from '@/components/AnimatedCharacters';
 
 export function LoginPage() {
@@ -16,21 +15,8 @@ export function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [isTyping, setIsTyping] = useState(false);
   const [passwordValue, setPasswordValue] = useState('');
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      // Normalize mouse position between -1 and 1
-      setMousePos({
-        x: (e.clientX / window.innerWidth - 0.5) * 2,
-        y: (e.clientY / window.innerHeight - 0.5) * 2,
-      });
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

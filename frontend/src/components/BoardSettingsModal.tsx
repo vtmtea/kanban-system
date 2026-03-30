@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { boardApi, swimlaneApi, webhookApi, transitionRuleApi, labelApi } from '@/services/api';
 import { AnalyticsDashboard } from '@/components/AnalyticsDashboard';
+import { SelectField } from '@/components/SelectField';
 import type { BoardMember, Swimlane, Webhook, ListTransitionRule, Label, List } from '@/types';
 
 interface BoardSettingsModalProps {
@@ -11,6 +12,8 @@ interface BoardSettingsModalProps {
 
 export function BoardSettingsModal({ boardId, onClose }: BoardSettingsModalProps) {
   const [activeSection, setActiveSection] = useState<string>('team');
+  const [ruleFromId, setRuleFromId] = useState('');
+  const [ruleToId, setRuleToId] = useState('');
   const queryClient = useQueryClient();
 
   // Queries
@@ -242,15 +245,17 @@ export function BoardSettingsModal({ boardId, onClose }: BoardSettingsModalProps
                                   </div>
                                   
                                   <div className="flex items-center gap-4">
-                                     <select
+                                     <SelectField
+                                        size="pill"
                                         value={member.role}
-                                        onChange={(e) => updateRoleMutation.mutate({ userId: member.user_id, role: e.target.value as 'admin' | 'member' | 'observer' })}
-                                        className="appearance-none bg-blue-50/80 text-[#0d6efd] font-extrabold text-[10px] uppercase tracking-widest px-4 py-2 rounded-full cursor-pointer hover:bg-blue-100 transition-colors outline-none text-center"
-                                     >
-                                        <option value="admin">Admin</option>
-                                        <option value="member">Member</option>
-                                        <option value="observer">Observer</option>
-                                     </select>
+                                        align="right"
+                                        onChange={(nextValue) => updateRoleMutation.mutate({ userId: member.user_id, role: nextValue as 'admin' | 'member' | 'observer' })}
+                                        options={[
+                                          { value: 'admin', label: 'Admin' },
+                                          { value: 'member', label: 'Member' },
+                                          { value: 'observer', label: 'Observer' },
+                                        ]}
+                                     />
                                      
                                      {member.role !== 'owner' && (
                                        <button onClick={() => removeMemberMutation.mutate(member.user_id)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
@@ -410,19 +415,33 @@ export function BoardSettingsModal({ boardId, onClose }: BoardSettingsModalProps
                         <div>
                            <h4 className="text-[11px] font-extrabold text-gray-400 uppercase tracking-widest mb-4">Transition Rules</h4>
                            <div className="flex flex-col sm:flex-row items-center gap-3 mb-6 bg-[#f8fafc] p-4 rounded-2xl border border-gray-100">
-                              <select id="rule-from" className="bg-white border border-gray-200 text-gray-800 text-sm font-bold rounded-lg px-4 py-2.5 w-full outline-none focus:border-[#0d6efd]">
-                                 <option value="">Status From...</option>
-                                 {lists.map((list: List) => (<option key={list.id} value={list.id}>{list.title}</option>))}
-                              </select>
+                              <SelectField
+                                size="md"
+                                value={ruleFromId}
+                                placeholder="Status From..."
+                                onChange={setRuleFromId}
+                                options={[
+                                  { value: '', label: 'Status From...' },
+                                  ...lists.map((list: List) => ({ value: String(list.id), label: list.title })),
+                                ]}
+                              />
                               <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-                              <select id="rule-to" className="bg-white border border-gray-200 text-gray-800 text-sm font-bold rounded-lg px-4 py-2.5 w-full outline-none focus:border-[#0d6efd]">
-                                 <option value="">Status To...</option>
-                                 {lists.map((list: List) => (<option key={list.id} value={list.id}>{list.title}</option>))}
-                              </select>
+                              <SelectField
+                                size="md"
+                                value={ruleToId}
+                                placeholder="Status To..."
+                                onChange={setRuleToId}
+                                options={[
+                                  { value: '', label: 'Status To...' },
+                                  ...lists.map((list: List) => ({ value: String(list.id), label: list.title })),
+                                ]}
+                              />
                               <button onClick={() => {
-                                 const fromId = (document.getElementById('rule-from') as HTMLSelectElement).value;
-                                 const toId = (document.getElementById('rule-to') as HTMLSelectElement).value;
-                                 if (fromId && toId && fromId !== toId) createRuleMutation.mutate({ from_list_id: Number(fromId), to_list_id: Number(toId) });
+                                 if (ruleFromId && ruleToId && ruleFromId !== ruleToId) {
+                                   createRuleMutation.mutate({ from_list_id: Number(ruleFromId), to_list_id: Number(ruleToId) });
+                                   setRuleFromId('');
+                                   setRuleToId('');
+                                 }
                               }} className="px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold w-full sm:w-auto hover:bg-black transition-colors shrink-0">Add Rule</button>
                            </div>
                            

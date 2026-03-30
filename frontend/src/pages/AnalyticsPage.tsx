@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Sidebar } from '@/components/Sidebar';
+import { TopNav } from '@/components/TopNav';
 
 export function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState('7d');
@@ -7,7 +8,7 @@ export function AnalyticsPage() {
   // SVG Icons for Sidebar
         
   return (
-    <div className="flex h-screen bg-[#f8fafc] font-sans antialiased text-gray-800 animate-slide-up-fade">
+    <div className="flex h-screen bg-[#f8fafc] font-sans antialiased text-gray-800">
       {/* Global Sidebar layout matching Settings and Dashboard */}
       <Sidebar activePage="analytics" />
 

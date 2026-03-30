@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { boardApi } from '@/services/api';
+import { SelectField } from '@/components/SelectField';
 import type { Activity } from '@/types';
 
 interface ActivitySidebarProps {
@@ -126,28 +127,32 @@ export function ActivitySidebar({ boardId, onClose }: ActivitySidebarProps) {
 
       {/* Filters */}
       <div className="px-4 py-2 border-b flex gap-2">
-        <select
+        <SelectField
+          size="sm"
           value={filter.entity_type || ''}
-          onChange={(e) => setFilter({ ...filter, entity_type: e.target.value || undefined })}
-          className="px-2 py-1 border rounded text-sm"
-        >
-          <option value="">全部类型</option>
-          <option value="card">卡片</option>
-          <option value="list">列表</option>
-          <option value="board">看板</option>
-        </select>
-        <select
+          placeholder="全部类型"
+          onChange={(nextValue) => setFilter({ ...filter, entity_type: nextValue || undefined })}
+          options={[
+            { value: '', label: '全部类型' },
+            { value: 'card', label: '卡片' },
+            { value: 'list', label: '列表' },
+            { value: 'board', label: '看板' },
+          ]}
+        />
+        <SelectField
+          size="sm"
           value={filter.action || ''}
-          onChange={(e) => setFilter({ ...filter, action: e.target.value || undefined })}
-          className="px-2 py-1 border rounded text-sm"
-        >
-          <option value="">全部操作</option>
-          <option value="created">创建</option>
-          <option value="updated">更新</option>
-          <option value="moved">移动</option>
-          <option value="deleted">删除</option>
-          <option value="completed">完成</option>
-        </select>
+          placeholder="全部操作"
+          onChange={(nextValue) => setFilter({ ...filter, action: nextValue || undefined })}
+          options={[
+            { value: '', label: '全部操作' },
+            { value: 'created', label: '创建' },
+            { value: 'updated', label: '更新' },
+            { value: 'moved', label: '移动' },
+            { value: 'deleted', label: '删除' },
+            { value: 'completed', label: '完成' },
+          ]}
+        />
       </div>
 
       {/* Activity List */}

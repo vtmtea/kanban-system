@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Sidebar } from '@/components/Sidebar';
+import { TopNav } from '@/components/TopNav';
+import { SelectField } from '@/components/SelectField';
 
 export function SettingsPage() {
   const [activeSection, setActiveSection] = useState('profile');
@@ -12,7 +14,7 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="flex h-screen bg-[#f8fafc] font-sans antialiased text-gray-800 animate-slide-up-fade">
+    <div className="flex h-screen bg-[#f8fafc] font-sans antialiased text-gray-800">
       {/* Global Sidebar */}
       <Sidebar activePage="settings" />
 
@@ -51,7 +53,7 @@ export function SettingsPage() {
 
            {/* Content Scrolling Area */}
            <div className="flex-1 overflow-y-auto w-full relative custom-scrollbar">
-              <div className="max-w-[800px] p-12 lg:p-14 space-y-10 pb-40">
+              <div className="max-w-[800px] p-12 lg:p-14 space-y-10 pb-40 animate-slide-up-fade stagger-delay-1">
                  
                  <div className="mb-2">
                    <h2 className="text-[28px] font-extrabold text-gray-900 tracking-tight mb-2">Settings</h2>
@@ -85,10 +87,14 @@ export function SettingsPage() {
                        </div>
                        <div>
                           <label className="block text-[11px] font-extrabold text-gray-400 uppercase tracking-widest mb-2">Timezone</label>
-                          <select className="w-full bg-[#ecf0f3]/50 px-4 py-3 rounded-xl border border-transparent focus:border-[#0d6efd] focus:bg-white outline-none font-bold text-[14px] text-gray-800 transition-colors cursor-pointer appearance-none">
-                             <option>GMT -05:00 Eastern Time</option>
-                             <option>GMT +01:00 Central European</option>
-                          </select>
+                          <SelectField
+                            size="lg"
+                            defaultValue="gmt-05"
+                            options={[
+                              { value: 'gmt-05', label: 'GMT -05:00 Eastern Time' },
+                              { value: 'gmt+01', label: 'GMT +01:00 Central European' },
+                            ]}
+                          />
                        </div>
                     </div>
                  </section>
