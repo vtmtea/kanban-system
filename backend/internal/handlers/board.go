@@ -18,10 +18,18 @@ func GetBoards(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 
 	var boards []models.Board
-	database.DB.Where("owner_id = ?", userID).
+	if err := database.DB.
+		Preload("Owner").
+		Preload("Lists", func(db *gorm.DB) *gorm.DB {
+			return db.Order("position ASC")
+		}).
+		Where("owner_id = ?", userID).
 		Or("id IN (SELECT board_id FROM board_members WHERE user_id = ?)", userID).
 		Order("created_at DESC").
-		Find(&boards)
+		Find(&boards).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch boards"})
+		return
+	}
 
 	result := make([]api.Board, len(boards))
 	for i, board := range boards {
@@ -33,6 +41,7 @@ func GetBoards(c *gin.Context) {
 
 // GetBoard 获取单个看板详情
 func GetBoard(c *gin.Context) {
+	userID := middleware.GetUserID(c)
 	boardID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid board ID"})
@@ -41,6 +50,9 @@ func GetBoard(c *gin.Context) {
 
 	var board models.Board
 	if err := database.DB.Preload("Owner").
+		Preload("Swimlanes", func(db *gorm.DB) *gorm.DB {
+			return db.Order("position ASC")
+		}).
 		Preload("Lists", func(db *gorm.DB) *gorm.DB {
 			return db.Order("position ASC")
 		}).
@@ -48,10 +60,22 @@ func GetBoard(c *gin.Context) {
 			return db.Order("position ASC")
 		}).
 		Preload("Lists.Cards.Labels").
+		Preload("Lists.Cards.Assignee").
+		Preload("Lists.Cards.ChecklistItems").
+		Preload("Lists.Cards.Attachments").
+		Preload("Lists.Cards.Comments").
 		Preload("Members.User").
 		First(&board, boardID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Board not found"})
 		return
+	}
+
+	if board.OwnerID != userID {
+		var member models.BoardMember
+		if err := database.DB.Where("board_id = ? AND user_id = ?", boardID, userID).First(&member).Error; err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You don't have access to this board"})
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, boardToAPI(board))
@@ -68,8 +92,22 @@ func CreateBoard(c *gin.Context) {
 	}
 
 	board := models.Board{
-		Title:       req.Title,
-		OwnerID:     userID,
+		Title:   req.Title,
+		OwnerID: userID,
+	}
+
+	if req.ProjectId != nil {
+		var project models.Project
+		if err := database.DB.First(&project, *req.ProjectId).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Project not found"})
+			return
+		}
+		if project.OwnerID != userID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "You don't have permission to create boards in this project"})
+			return
+		}
+		projectID := uint(*req.ProjectId)
+		board.ProjectID = &projectID
 	}
 
 	if req.Description != nil {
@@ -144,6 +182,23 @@ func UpdateBoard(c *gin.Context) {
 	}
 	if req.Description != nil {
 		board.Description = *req.Description
+	}
+	if req.ProjectId != nil {
+		if *req.ProjectId == 0 {
+			board.ProjectID = nil
+		} else {
+			var project models.Project
+			if err := database.DB.First(&project, *req.ProjectId).Error; err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Project not found"})
+				return
+			}
+			if project.OwnerID != userID {
+				c.JSON(http.StatusForbidden, gin.H{"error": "You don't have permission to move this board into the target project"})
+				return
+			}
+			projectID := uint(*req.ProjectId)
+			board.ProjectID = &projectID
+		}
 	}
 	if req.Color != nil {
 		board.Color = *req.Color

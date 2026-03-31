@@ -11,7 +11,48 @@ import (
 	"kanban-system/backend/internal/models"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
+
+func clampCardPosition(position int, max int) int {
+	if position < 0 {
+		return 0
+	}
+	if position > max {
+		return max
+	}
+	return position
+}
+
+func insertCardAt(cards []models.Card, card models.Card, position int) []models.Card {
+	position = clampCardPosition(position, len(cards))
+
+	reordered := make([]models.Card, 0, len(cards)+1)
+	reordered = append(reordered, cards[:position]...)
+	reordered = append(reordered, card)
+	reordered = append(reordered, cards[position:]...)
+
+	return reordered
+}
+
+func persistCardOrder(tx *gorm.DB, listID uint, cards []models.Card) error {
+	for index, orderedCard := range cards {
+		if orderedCard.ListID == listID && orderedCard.Position == index {
+			continue
+		}
+
+		if err := tx.Model(&models.Card{}).
+			Where("id = ?", orderedCard.ID).
+			Updates(map[string]any{
+				"list_id":  listID,
+				"position": index,
+			}).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
 
 // GetCard 获取卡片详情
 func GetCard(c *gin.Context) {
@@ -80,9 +121,9 @@ func CreateCard(c *gin.Context) {
 	database.DB.Model(&models.Card{}).Where("list_id = ?", listID).Select("COALESCE(MAX(position), -1)").Scan(&maxPosition)
 
 	card := models.Card{
-		ListID:     uint(listID),
-		Title:      req.Title,
-		Position:   maxPosition + 1,
+		ListID:   uint(listID),
+		Title:    req.Title,
+		Position: maxPosition + 1,
 	}
 	if req.SwimlaneId != nil {
 		swimlaneID := uint(*req.SwimlaneId)
@@ -230,14 +271,16 @@ func MoveCard(c *gin.Context) {
 		return
 	}
 
+	isSameListMove := card.ListID == uint(req.ListId)
+
 	// 检查状态转移规则
-	if !checkTransitionRule(card.ListID, uint(req.ListId), targetList.BoardID) {
+	if !isSameListMove && !checkTransitionRule(card.ListID, uint(req.ListId), targetList.BoardID) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "This transition is not allowed"})
 		return
 	}
 
 	// 检查目标列表的 WIP 限制
-	if targetList.WipLimit != nil && card.ListID != uint(req.ListId) {
+	if targetList.WipLimit != nil && !isSameListMove {
 		var currentCount int64
 		database.DB.Model(&models.Card{}).Where("list_id = ?", req.ListId).Count(&currentCount)
 		if int(currentCount) >= *targetList.WipLimit {
@@ -247,42 +290,93 @@ func MoveCard(c *gin.Context) {
 	}
 
 	oldListID := card.ListID
-	card.ListID = uint(req.ListId)
-	if req.Position != nil {
-		card.Position = *req.Position
-	}
+	targetListID := uint(req.ListId)
 
-	if err := database.DB.Save(&card).Error; err != nil {
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		targetPosition := 0
+		if req.Position != nil {
+			targetPosition = *req.Position
+		}
+
+		if isSameListMove {
+			var siblingCards []models.Card
+			if err := tx.Where("list_id = ? AND id <> ?", card.ListID, card.ID).
+				Order("position ASC").
+				Find(&siblingCards).Error; err != nil {
+				return err
+			}
+
+			targetPosition = clampCardPosition(targetPosition, len(siblingCards))
+			reorderedCards := insertCardAt(siblingCards, card, targetPosition)
+			return persistCardOrder(tx, card.ListID, reorderedCards)
+		}
+
+		var sourceCards []models.Card
+		if err := tx.Where("list_id = ? AND id <> ?", oldListID, card.ID).
+			Order("position ASC").
+			Find(&sourceCards).Error; err != nil {
+			return err
+		}
+
+		var targetCards []models.Card
+		if err := tx.Where("list_id = ?", targetListID).
+			Order("position ASC").
+			Find(&targetCards).Error; err != nil {
+			return err
+		}
+
+		targetPosition = clampCardPosition(targetPosition, len(targetCards))
+		reorderedTargetCards := insertCardAt(targetCards, card, targetPosition)
+
+		if err := persistCardOrder(tx, oldListID, sourceCards); err != nil {
+			return err
+		}
+
+		return persistCardOrder(tx, targetListID, reorderedTargetCards)
+	}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to move card"})
 		return
 	}
 
 	// 更新卡片历史
-	var oldHistory models.CardHistory
-	if database.DB.Where("card_id = ? AND exited_at IS NULL", cardID).First(&oldHistory).Error == nil {
-		now := time.Now()
-		oldHistory.ExitedAt = &now
-		database.DB.Save(&oldHistory)
-	}
+	if !isSameListMove {
+		var oldHistory models.CardHistory
+		if database.DB.Where("card_id = ? AND exited_at IS NULL", cardID).First(&oldHistory).Error == nil {
+			now := time.Now()
+			oldHistory.ExitedAt = &now
+			database.DB.Save(&oldHistory)
+		}
 
-	newHistory := models.CardHistory{
-		CardID:    card.ID,
-		ListID:    uint(req.ListId),
-		EnteredAt: time.Now(),
+		newHistory := models.CardHistory{
+			CardID:    card.ID,
+			ListID:    uint(req.ListId),
+			EnteredAt: time.Now(),
+		}
+		database.DB.Create(&newHistory)
 	}
-	database.DB.Create(&newHistory)
 
 	// 自动指派
-	var assignment models.ListAutoAssignment
-	if database.DB.Where("list_id = ?", req.ListId).Preload("User").First(&assignment).Error == nil {
-		card.AssigneeID = &assignment.UserID
-		database.DB.Save(&card)
+	if !isSameListMove {
+		var assignment models.ListAutoAssignment
+		if database.DB.Where("list_id = ?", req.ListId).Preload("User").First(&assignment).Error == nil {
+			card.AssigneeID = &assignment.UserID
+			database.DB.Save(&card)
+		}
+	}
+
+	if err := database.DB.Preload("Assignee").First(&card, cardID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load moved card"})
+		return
 	}
 
 	// 记录活动
 	var oldList models.List
 	database.DB.First(&oldList, oldListID)
-	logActivity(uint(req.ListId), userID, "moved", "card", card.ID, "Moved card from "+oldList.Title+" to "+targetList.Title)
+	if isSameListMove {
+		logActivity(uint(req.ListId), userID, "moved", "card", card.ID, "Reordered card in "+targetList.Title)
+	} else {
+		logActivity(uint(req.ListId), userID, "moved", "card", card.ID, "Moved card from "+oldList.Title+" to "+targetList.Title)
+	}
 
 	// WebSocket 广播
 	BroadcastToBoard(targetList.BoardID, "moved", "card", card.ID, cardToAPI(card), userID)
@@ -326,6 +420,45 @@ func CompleteCard(c *gin.Context) {
 	var list models.List
 	database.DB.First(&list, card.ListID)
 	BroadcastToBoard(list.BoardID, "completed", "card", card.ID, cardToAPI(card), userID)
+
+	c.JSON(http.StatusOK, cardToAPI(card))
+}
+
+// ReopenCard 重新打开卡片
+func ReopenCard(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	cardID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid card ID"})
+		return
+	}
+
+	var card models.Card
+	if err := database.DB.First(&card, cardID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Card not found"})
+		return
+	}
+
+	// 检查权限
+	if !checkBoardAccess(card.ListID, userID, "member") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have access to this card"})
+		return
+	}
+
+	card.CompletedAt = nil
+
+	if err := database.DB.Save(&card).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reopen card"})
+		return
+	}
+
+	// 记录活动
+	logActivity(card.ListID, userID, "reopened", "card", card.ID, "Reopened card: "+card.Title)
+
+	// WebSocket 广播
+	var list models.List
+	database.DB.First(&list, card.ListID)
+	BroadcastToBoard(list.BoardID, "reopened", "card", card.ID, cardToAPI(card), userID)
 
 	c.JSON(http.StatusOK, cardToAPI(card))
 }

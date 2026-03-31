@@ -5,6 +5,37 @@ import (
 	"kanban-system/backend/internal/models"
 )
 
+// projectToAPI 将 models.Project 转换为 api.Project
+func projectToAPI(project models.Project) *api.Project {
+	p := &api.Project{
+		Id:          int(project.ID),
+		Title:       project.Title,
+		Description: &project.Description,
+		OwnerId:     int(project.OwnerID),
+		Color:       &project.Color,
+		StartDate:   &project.StartDate,
+		TargetDate:  &project.TargetDate,
+		Status:      &project.Status,
+		Priority:    &project.Priority,
+		CreatedAt:   &project.CreatedAt,
+		UpdatedAt:   &project.UpdatedAt,
+	}
+
+	if project.Owner != nil {
+		p.Owner = userToAPI(*project.Owner)
+	}
+
+	if len(project.Boards) > 0 {
+		boards := make([]api.Board, len(project.Boards))
+		for i, board := range project.Boards {
+			boards[i] = *boardToAPI(board)
+		}
+		p.Boards = &boards
+	}
+
+	return p
+}
+
 // boardToAPI 将 models.Board 转换为 api.Board
 func boardToAPI(board models.Board) *api.Board {
 	b := &api.Board{
@@ -16,6 +47,11 @@ func boardToAPI(board models.Board) *api.Board {
 		IsPublic:    &board.IsPublic,
 		CreatedAt:   &board.CreatedAt,
 		UpdatedAt:   &board.UpdatedAt,
+	}
+
+	if board.ProjectID != nil {
+		projectID := int(*board.ProjectID)
+		b.ProjectId = &projectID
 	}
 
 	if board.Owner != nil {

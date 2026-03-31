@@ -6,6 +6,7 @@ export type { paths, operations };
 
 // Export schema types from components
 export type User = components['schemas']['User'];
+export type Project = components['schemas']['Project'];
 export type Board = components['schemas']['Board'];
 export type List = components['schemas']['List'];
 export type Card = components['schemas']['Card'];
@@ -31,6 +32,8 @@ export type RegisterRequest = components['schemas']['RegisterRequest'];
 export type LoginRequest = components['schemas']['LoginRequest'];
 export type LoginResponse = components['schemas']['LoginResponse'];
 export type UpdateUserRequest = components['schemas']['UpdateUserRequest'];
+export type CreateProjectRequest = components['schemas']['CreateProjectRequest'];
+export type UpdateProjectRequest = components['schemas']['UpdateProjectRequest'];
 export type CreateBoardRequest = components['schemas']['CreateBoardRequest'];
 export type UpdateBoardRequest = components['schemas']['UpdateBoardRequest'];
 export type CreateSwimlaneRequest = components['schemas']['CreateSwimlaneRequest'];

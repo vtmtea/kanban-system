@@ -149,6 +149,8 @@ func DeleteAttachment(c *gin.Context) {
 		return
 	}
 
+	logActivityByCardID(attachment.CardID, userID, "deleted", "attachment", attachment.ID, "Deleted attachment: "+attachment.FileName)
+
 	c.JSON(http.StatusOK, api.MessageResponse{Message: "Attachment deleted successfully"})
 }
 

@@ -19,9 +19,29 @@ type User struct {
 	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`
 }
 
+// Project 项目模型
+type Project struct {
+	ID          uint           `json:"id" gorm:"primaryKey"`
+	Title       string         `json:"title" gorm:"size:100;not null"`
+	Description string         `json:"description" gorm:"size:500"`
+	OwnerID     uint           `json:"owner_id" gorm:"not null;index"`
+	Owner       *User          `json:"owner,omitempty" gorm:"foreignKey:OwnerID"`
+	Color       string         `json:"color" gorm:"size:7"`
+	StartDate   string         `json:"start_date" gorm:"size:20"`
+	TargetDate  string         `json:"target_date" gorm:"size:20"`
+	Status      string         `json:"status" gorm:"size:20"`
+	Priority    string         `json:"priority" gorm:"size:20"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `json:"-" gorm:"index"`
+	Boards      []Board        `json:"boards,omitempty" gorm:"foreignKey:ProjectID"`
+}
+
 // Board 看板模型
 type Board struct {
 	ID          uint           `json:"id" gorm:"primaryKey"`
+	ProjectID   *uint          `json:"project_id" gorm:"index"`
+	Project     *Project       `json:"project,omitempty" gorm:"foreignKey:ProjectID"`
 	Title       string         `json:"title" gorm:"size:100;not null"`
 	Description string         `json:"description" gorm:"size:500"`
 	OwnerID     uint           `json:"owner_id" gorm:"not null;index"`

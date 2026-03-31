@@ -158,6 +158,8 @@ func DeleteChecklistItem(c *gin.Context) {
 		return
 	}
 
+	logActivityByCardID(item.CardID, userID, "deleted", "checklist_item", item.ID, "Deleted checklist item: "+item.Content)
+
 	c.JSON(http.StatusOK, api.MessageResponse{Message: "Checklist item deleted successfully"})
 }
 

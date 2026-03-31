@@ -6,6 +6,7 @@ import (
 
 	"kanban-system/backend/internal/api"
 	"kanban-system/backend/internal/database"
+	"kanban-system/backend/internal/middleware"
 	"kanban-system/backend/internal/models"
 
 	"github.com/gin-gonic/gin"
@@ -69,14 +70,33 @@ func GetBoardActivities(c *gin.Context) {
 
 // GetCardActivities 获取卡片活动日志
 func GetCardActivities(c *gin.Context) {
+	userID := middleware.GetUserID(c)
 	cardID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid card ID"})
 		return
 	}
 
+	var card models.Card
+	if err := database.DB.First(&card, cardID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Card not found"})
+		return
+	}
+
+	if !checkBoardAccess(card.ListID, userID, "member") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have access to this card"})
+		return
+	}
+
 	var activities []models.Activity
-	database.DB.Where("entity_id = ? AND entity_type = ?", cardID, "card").
+	database.DB.
+		Where("(entity_type = ? AND entity_id = ?)", "card", cardID).
+		Or("(entity_type = ? AND entity_id IN (?))", "comment",
+			database.DB.Model(&models.Comment{}).Select("id").Where("card_id = ?", cardID)).
+		Or("(entity_type = ? AND entity_id IN (?))", "checklist_item",
+			database.DB.Model(&models.ChecklistItem{}).Select("id").Where("card_id = ?", cardID)).
+		Or("(entity_type = ? AND entity_id IN (?))", "attachment",
+			database.DB.Model(&models.Attachment{}).Select("id").Where("card_id = ?", cardID)).
 		Preload("User").
 		Order("created_at DESC").
 		Find(&activities)

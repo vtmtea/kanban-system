@@ -117,6 +117,8 @@ func UpdateComment(c *gin.Context) {
 		return
 	}
 
+	logActivityByCardID(comment.CardID, userID, "updated", "comment", comment.ID, "Updated a comment")
+
 	// 加载用户信息
 	database.DB.Preload("User").First(&comment, comment.ID)
 
@@ -148,6 +150,8 @@ func DeleteComment(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete comment"})
 		return
 	}
+
+	logActivityByCardID(comment.CardID, userID, "deleted", "comment", comment.ID, "Deleted a comment")
 
 	c.JSON(http.StatusOK, api.MessageResponse{Message: "Comment deleted successfully"})
 }

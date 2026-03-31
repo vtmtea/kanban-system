@@ -29,3 +29,5 @@ internal/api/generated.go
 # IDE
 .idea/
 .vscode/
+
+.env

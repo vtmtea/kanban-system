@@ -36,6 +36,14 @@ func SetupRoutes(r *gin.Engine) {
 			// 用户相关
 			protected.GET("/user", handlers.GetCurrentUser)
 			protected.PUT("/user", handlers.UpdateCurrentUser)
+			protected.GET("/users", handlers.GetUsers)
+
+			// 项目相关
+			protected.GET("/projects", handlers.GetProjects)
+			protected.GET("/projects/:id", handlers.GetProject)
+			protected.POST("/projects", handlers.CreateProject)
+			protected.PUT("/projects/:id", handlers.UpdateProject)
+			protected.DELETE("/projects/:id", handlers.DeleteProject)
 
 			// 看板相关
 			protected.GET("/boards", handlers.GetBoards)
@@ -75,6 +83,7 @@ func SetupRoutes(r *gin.Engine) {
 			protected.PUT("/cards/:id", handlers.UpdateCard)
 			protected.PUT("/cards/:id/move", handlers.MoveCard)
 			protected.PUT("/cards/:id/complete", handlers.CompleteCard)
+			protected.PUT("/cards/:id/reopen", handlers.ReopenCard)
 			protected.PUT("/cards/:id/assign", handlers.AssignCard)
 			protected.DELETE("/cards/:id", handlers.DeleteCard)
 

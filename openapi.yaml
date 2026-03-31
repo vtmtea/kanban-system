@@ -141,6 +141,162 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /users:
+    get:
+      tags:
+        - user
+      summary: 搜索用户列表
+      operationId: getUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 按用户名、昵称或邮箱搜索
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 8
+        - name: exclude_board_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: 排除该看板中已存在的成员
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          description: 未授权
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # 看板接口
+  /projects:
+    get:
+      tags:
+        - project
+      summary: 获取项目列表
+      operationId: getProjects
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Project'
+    post:
+      tags:
+        - project
+      summary: 创建项目
+      operationId: createProject
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+
+  /projects/{id}:
+    get:
+      tags:
+        - project
+      summary: 获取项目详情
+      operationId: getProject
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '404':
+          description: 项目不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags:
+        - project
+      summary: 更新项目
+      operationId: updateProject
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+    delete:
+      tags:
+        - project
+      summary: 删除项目
+      operationId: deleteProject
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
   # 看板接口
   /boards:
     get:
@@ -1608,6 +1764,8 @@ components:
       properties:
         id:
           type: integer
+        project_id:
+          type: integer
         title:
           type: string
         description:
@@ -1642,6 +1800,44 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Label'
+      required:
+        - id
+        - title
+        - owner_id
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        owner_id:
+          type: integer
+        owner:
+          $ref: '#/components/schemas/User'
+        color:
+          type: string
+        start_date:
+          type: string
+        target_date:
+          type: string
+        status:
+          type: string
+        priority:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        boards:
+          type: array
+          items:
+            $ref: '#/components/schemas/Board'
       required:
         - id
         - title
@@ -2171,9 +2367,63 @@ components:
         avatar:
           type: string
 
+    CreateProjectRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        color:
+          type: string
+          maxLength: 7
+        start_date:
+          type: string
+          maxLength: 20
+        target_date:
+          type: string
+          maxLength: 20
+        status:
+          type: string
+          maxLength: 20
+        priority:
+          type: string
+          maxLength: 20
+      required:
+        - title
+
+    UpdateProjectRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        color:
+          type: string
+          maxLength: 7
+        start_date:
+          type: string
+          maxLength: 20
+        target_date:
+          type: string
+          maxLength: 20
+        status:
+          type: string
+          maxLength: 20
+        priority:
+          type: string
+          maxLength: 20
+
     CreateBoardRequest:
       type: object
       properties:
+        project_id:
+          type: integer
         title:
           type: string
           maxLength: 100
@@ -2191,6 +2441,8 @@ components:
     UpdateBoardRequest:
       type: object
       properties:
+        project_id:
+          type: integer
         title:
           type: string
           maxLength: 100

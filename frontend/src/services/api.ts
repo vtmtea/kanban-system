@@ -1,10 +1,12 @@
 import axios from 'axios';
 import type {
   User,
+  Project,
   Board,
   List,
   Card,
   Comment,
+  Activity,
   Label,
   Swimlane,
   ChecklistItem,
@@ -22,6 +24,8 @@ import type {
   LoginResponse,
   RegisterRequest,
   UpdateUserRequest,
+  CreateProjectRequest,
+  UpdateProjectRequest,
   CreateBoardRequest,
   UpdateBoardRequest,
   CreateSwimlaneRequest,
@@ -85,6 +89,20 @@ export const authApi = {
   updateUser: (data: UpdateUserRequest) => api.put<User>('/user', data),
 };
 
+export const userApi = {
+  search: (params?: { q?: string; limit?: number; exclude_board_id?: number }) =>
+    api.get<User[]>('/users', { params }),
+};
+
+// 项目相关
+export const projectApi = {
+  getAll: () => api.get<Project[]>('/projects'),
+  getOne: (id: number) => api.get<Project>(`/projects/${id}`),
+  create: (data: CreateProjectRequest) => api.post<Project>('/projects', data),
+  update: (id: number, data: UpdateProjectRequest) => api.put<Project>(`/projects/${id}`, data),
+  delete: (id: number) => api.delete(`/projects/${id}`),
+};
+
 // 看板相关
 export const boardApi = {
   getAll: () => api.get<Board[]>('/boards'),
@@ -137,6 +155,7 @@ export const listApi = {
 // 卡片相关
 export const cardApi = {
   getOne: (id: number) => api.get<Card>(`/cards/${id}`),
+  getActivities: (id: number) => api.get<Activity[]>(`/cards/${id}/activities`),
   create: (listId: number, data: CreateCardRequest) => api.post<Card>(`/lists/${listId}/cards`, data),
   update: (id: number, data: UpdateCardRequest) => api.put<Card>(`/cards/${id}`, data),
   move: (id: number, data: MoveCardRequest) => api.put<Card>(`/cards/${id}/move`, data),
@@ -144,6 +163,7 @@ export const cardApi = {
   addLabel: (cardId: number, labelId: number) => api.post(`/cards/${cardId}/labels/${labelId}`),
   removeLabel: (cardId: number, labelId: number) => api.delete(`/cards/${cardId}/labels/${labelId}`),
   complete: (id: number) => api.put<Card>(`/cards/${id}/complete`),
+  reopen: (id: number) => api.put<Card>(`/cards/${id}/reopen`),
   assign: (id: number, data: AssignCardRequest) => api.put<Card>(`/cards/${id}/assign`, data),
   // Checklist
   getChecklist: (id: number) => api.get<ChecklistItem[]>(`/cards/${id}/checklist`),
@@ -168,6 +188,7 @@ export const cardApi = {
 export const commentApi = {
   getAll: (cardId: number) => api.get<Comment[]>(`/cards/${cardId}/comments`),
   create: (cardId: number, data: CreateCommentRequest) => api.post<Comment>(`/cards/${cardId}/comments`, data),
+  update: (id: number, data: { content?: string }) => api.put<Comment>(`/comments/${id}`, data),
   delete: (id: number) => api.delete(`/comments/${id}`),
 };
 

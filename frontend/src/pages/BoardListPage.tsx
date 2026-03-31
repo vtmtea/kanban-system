@@ -1,213 +1,166 @@
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Sidebar } from '@/components/Sidebar';
 import { TopNav } from '@/components/TopNav';
+import { projectApi } from '@/services/api';
+import type { Project } from '@/types';
+
+const priorityClasses: Record<string, string> = {
+  urgent: 'bg-[#ffe1e1] text-[#b42318]',
+  high: 'bg-[#fff0dd] text-[#b45309]',
+  medium: 'bg-[#e4ecff] text-[#0f4fe6]',
+  low: 'bg-[#e8f5ec] text-[#027a48]',
+};
+
+const statusClasses: Record<string, string> = {
+  planning: 'bg-[#eef4fa] text-[#4e5f74]',
+  active: 'bg-[#dfe7ff] text-[#0f4fe6]',
+  'on-hold': 'bg-[#fff0dd] text-[#b45309]',
+  completed: 'bg-[#e8f5ec] text-[#027a48]',
+};
 
 export function BoardListPage() {
-  // Svg icons
-              
+  const { data, isLoading } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => projectApi.getAll(),
+  });
+
+  const projects = data?.data || [];
+
   return (
-    <div className="flex h-screen bg-[#f8fafc] font-sans antialiased text-gray-800">
-      {/* Sidebar */}
+    <div className="flex h-screen bg-[#eef4fa] font-sans text-[#162231]">
       <Sidebar activePage="projects" />
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden relative">
-        {/* Top Navbar */}
-        <TopNav title="Projects" />
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f7fbff]">
+        <TopNav title="" searchPlaceholder="Search projects..." />
 
-        {/* Scrollable Dashboard Content */}
-        <div className="flex-1 overflow-auto bg-[#f8fafc] p-8 pt-4">
-          <div className="max-w-6xl mx-auto">
-            
-            {/* Header Area */}
-            <div className="flex justify-between items-end mb-8 animate-slide-up-fade">
+        <div className="flex-1 overflow-auto px-10 pb-10 pt-8">
+          <div className="mx-auto max-w-[1240px]">
+            <div className="mb-10 flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
               <div>
-                <h1 className="text-[28px] font-bold text-gray-900 mb-1">Project Dashboard</h1>
-                <p className="text-gray-500 text-sm">Manage and monitor your team's active work streams.</p>
+                <h1 className="text-[38px] font-extrabold tracking-tight text-[#162231]">Projects</h1>
+                <p className="mt-2 text-[17px] font-medium text-[#5b6b80]">
+                  Projects are the parent layer above boards. Create one, then organize delivery inside its boards.
+                </p>
               </div>
-              <div className="flex gap-3">
-                <div className="bg-white border border-gray-200 rounded-lg p-1 flex shadow-sm">
-                  <button className="px-3 py-1.5 bg-white text-[#0d6efd] text-sm font-semibold rounded-md shadow-sm border border-gray-100">Grid</button>
-                  <button className="px-3 py-1.5 text-gray-500 hover:text-gray-700 text-sm font-medium rounded-md">List</button>
-                </div>
-                <button className="px-4 py-2 bg-[#e2e8f0] hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-                  Filters
+
+              <div className="flex items-center gap-4">
+                <button className="flex h-14 items-center gap-3 rounded-2xl border border-[#d9e3ef] bg-white px-6 text-[16px] font-semibold text-[#162231] shadow-[0_8px_24px_rgba(17,24,39,0.05)]">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M3 5h18M6 12h12M10 19h4" />
+                  </svg>
+                  All Projects
                 </button>
-                <Link to="/projects/new" className="px-4 py-2 bg-[#0d6efd] hover:bg-blue-700 text-white rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.4} d="M12 4v16m8-8H4" /></svg>
+                <Link to="/projects/new" className="flex h-14 items-center gap-3 rounded-2xl bg-[#0f4fe6] px-7 text-[16px] font-bold text-white shadow-[0_16px_32px_rgba(15,79,230,0.24)]">
+                  <span className="text-[26px] leading-none">+</span>
                   New Project
                 </Link>
               </div>
             </div>
 
-            {/* Grid Row 1 (Top Projects) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-              
-              {/* Card 1 */}
-              <Link to="/projects/1" className="block bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-xl hover:border-blue-200 hover:-translate-y-1.5 transition-all duration-300 ease-out group animate-slide-up-fade stagger-delay-1 cursor-pointer">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">N</div>
-                  <span className="px-2.5 py-1 bg-orange-100 text-orange-700 text-[10px] font-bold rounded uppercase tracking-wider">High Priority</span>
-                </div>
-                <h3 className="font-bold text-gray-900 text-[17px] mb-2 leading-tight">Nebula Cloud Infrastructure</h3>
-                <p className="text-sm text-gray-500 mb-6 line-clamp-2 leading-relaxed">Migration of legacy database clusters to modern serverless architecture with zero downtime requirements.</p>
-                <div className="mb-4">
-                  <div className="flex justify-between text-xs font-semibold mb-2">
-                    <span className="text-gray-500">Progress</span>
-                    <span className="text-gray-900">65%</span>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                    <div className="bg-[#0d6efd] h-1.5 rounded-full relative group-hover:opacity-80 transition-opacity" style={{ width: '65%' }}>
-                      <div className="absolute inset-0 bg-white/20 w-full animate-[pulse_2s_ease-in-out_infinite] rounded-full"></div>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center pt-2">
-                  <div className="flex items-center gap-3 text-gray-400 text-sm font-medium">
-                    <div className="flex items-center"><svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg> 12</div>
-                    <div className="flex items-center text-red-500"><svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> 3</div>
-                  </div>
-                  <div className="flex -space-x-2">
-                    <img className="w-6 h-6 rounded-full border-2 border-white" src="https://i.pravatar.cc/100?img=1" alt="Avatar"/>
-                    <img className="w-6 h-6 rounded-full border-2 border-white" src="https://i.pravatar.cc/100?img=2" alt="Avatar"/>
-                    <div className="w-6 h-6 rounded-full border-2 border-white bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-600">+4</div>
-                  </div>
-                </div>
-              </Link>
-
-              {/* Card 2 */}
-              <Link to="/projects/2" className="block bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-xl hover:border-indigo-200 hover:-translate-y-1.5 transition-all duration-300 ease-out group animate-slide-up-fade stagger-delay-2 cursor-pointer">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg group-hover:scale-110 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">V</div>
-                  <span className="px-2.5 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold rounded uppercase tracking-wider">In Progress</span>
-                </div>
-                <h3 className="font-bold text-gray-900 text-[17px] mb-2 leading-tight">Vanguard UI Redesign</h3>
-                <p className="text-sm text-gray-500 mb-6 line-clamp-2 leading-relaxed">Complete overhaul of the customer-facing dashboard focusing on accessibility and responsive mobile layouts.</p>
-                <div className="mb-4">
-                  <div className="flex justify-between text-xs font-semibold mb-2">
-                    <span className="text-gray-500">Progress</span>
-                    <span className="text-gray-900">32%</span>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                    <div className="bg-[#0d6efd] h-1.5 rounded-full group-hover:opacity-80 transition-opacity" style={{ width: '32%' }}></div>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center pt-2">
-                  <div className="flex items-center gap-3 text-gray-400 text-sm font-medium">
-                    <div className="flex items-center"><svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg> 48</div>
-                    <div className="flex items-center"><svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> 0</div>
-                  </div>
-                  <div className="flex -space-x-2">
-                    <img className="w-6 h-6 rounded-full border-2 border-white" src="https://i.pravatar.cc/100?img=3" alt="Avatar"/>
-                    <img className="w-6 h-6 rounded-full border-2 border-white" src="https://i.pravatar.cc/100?img=4" alt="Avatar"/>
-                  </div>
-                </div>
-              </Link>
-
-              {/* Card 3 */}
-              <Link to="/projects/3" className="block bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-xl hover:border-orange-200 hover:-translate-y-1.5 transition-all duration-300 ease-out group animate-slide-up-fade stagger-delay-3 cursor-pointer">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-lg group-hover:scale-110 group-hover:bg-orange-600 group-hover:text-white transition-all duration-300">S</div>
-                  <span className="px-2.5 py-1 bg-gray-100 text-gray-600 text-[10px] font-bold rounded uppercase tracking-wider">Review</span>
-                </div>
-                <h3 className="font-bold text-gray-900 text-[17px] mb-2 leading-tight">Solaris API Suite</h3>
-                <p className="text-sm text-gray-500 mb-6 line-clamp-2 leading-relaxed">Internal API documentation and SDK generation for the Solaris third-party developer integration portal.</p>
-                <div className="mb-4">
-                  <div className="flex justify-between text-xs font-semibold mb-2">
-                    <span className="text-gray-500">Progress</span>
-                    <span className="text-gray-900">94%</span>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                    <div className="bg-gray-700 h-1.5 rounded-full group-hover:opacity-80 transition-opacity" style={{ width: '94%' }}></div>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center pt-2">
-                  <div className="flex items-center gap-3 text-gray-400 text-sm font-medium">
-                    <div className="flex items-center"><svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg> 5</div>
-                    <div className="flex items-center"><svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> 0</div>
-                  </div>
-                  <div className="flex -space-x-2">
-                    <img className="w-6 h-6 rounded-full border-2 border-white" src="https://i.pravatar.cc/100?img=5" alt="Avatar"/>
-                    <div className="w-6 h-6 rounded-full border-2 border-white bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-600">+1</div>
-                  </div>
-                </div>
-              </Link>
-
-            </div>
-
-            {/* Grid Row 2 (Featured Cards) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              
-              {/* Featured Promo Card (Takes 2 cols) */}
-              <Link to="/projects/1" className="block md:col-span-2 relative bg-gray-900 rounded-2xl overflow-hidden shadow-lg group hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-500 animate-slide-up-fade stagger-delay-4 cursor-pointer">
-                <div className="absolute inset-0 bg-gradient-to-r from-gray-900 via-gray-900/80 to-transparent z-10"></div>
-                {/* Abstract animated/colorful wavy background representation */}
-                <div className="absolute inset-0 opacity-40 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-700 via-indigo-800 to-gray-900 group-hover:scale-105 group-hover:rotate-1 transition-transform duration-700 ease-out"></div>
-                <div className="relative z-20 p-8 h-full flex flex-col justify-center transform group-hover:translate-x-2 transition-transform duration-500">
-                  <span className="self-start px-3 py-1 bg-white/10 text-white text-[10px] font-bold rounded uppercase tracking-widest mb-4 backdrop-blur-sm border border-white/10">Ongoing Campaign</span>
-                  <h2 className="text-3xl font-bold text-white mb-3">Q4 Brand Evolution</h2>
-                  <p className="text-gray-300 mb-8 max-w-lg leading-relaxed text-sm">Managing the global rollout of the new visual identity across 14 markets. Tracking creative assets, stakeholder approvals, and media buys.</p>
-                  <div className="flex items-center gap-4 mt-auto">
-                    <div className="flex items-center gap-3 bg-white/10 px-4 py-2.5 rounded-lg backdrop-blur-sm">
-                      <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                      </div>
-                      <div>
-                        <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Live In</div>
-                        <div className="text-white font-bold leading-none">12 Days</div>
-                      </div>
-                    </div>
-                    <button className="bg-white hover:bg-gray-100 text-gray-900 px-6 py-2.5 rounded-lg font-bold text-sm transition-all shadow-sm hover:scale-105 active:scale-95">
-                      View Board
-                    </button>
-                  </div>
-                </div>
-              </Link>
-
-              {/* Weekly Velocity Card (Takes 1 col) */}
-              <Link to="/projects/1" className="block bg-[#0d6efd] rounded-2xl p-8 flex flex-col justify-between text-white shadow-lg relative overflow-hidden group hover:shadow-blue-500/40 hover:-translate-y-1.5 transition-all duration-300 animate-slide-up-fade stagger-delay-5 cursor-pointer">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700 ease-in-out"></div>
-                <div className="relative z-10">
-                  <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center mb-6 group-hover:rotate-12 group-hover:scale-110 transition-all duration-300">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                  </div>
-                  <h3 className="font-bold text-[18px] mb-2">Weekly Velocity</h3>
-                  <div className="flex items-end gap-2 mb-2">
-                    <span className="text-5xl font-extrabold tracking-tighter">84%</span>
-                    <span className="text-blue-200 text-sm font-semibold mb-1">+12% vs last week</span>
-                  </div>
-                </div>
-                <div className="mt-8">
-                  <div className="flex justify-between text-xs font-bold mb-2">
-                    <span className="text-blue-100">Completed Tasks</span>
-                    <span>142</span>
-                  </div>
-                  <div className="w-full bg-blue-700/50 rounded-full h-1">
-                    <div className="bg-white h-1 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)]" style={{ width: '84%' }}></div>
-                  </div>
-                </div>
-              </Link>
-
-            </div>
-
-            {/* Empty State / CTA Card */}
-            <div className="border-2 border-dashed border-gray-200 rounded-2xl p-10 flex flex-col items-center justify-center text-center bg-white/50 mb-8 hover:bg-white hover:border-blue-300 transition-all duration-300 animate-slide-up-fade stagger-delay-5 group">
-              <div className="w-12 h-12 bg-gray-100 group-hover:bg-blue-50 group-hover:text-blue-500 rounded-full flex items-center justify-center text-gray-400 mb-4 transition-colors duration-300">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            {isLoading ? (
+              <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div key={index} className="h-[260px] rounded-[30px] bg-[#eef4fa] animate-pulse" />
+                ))}
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Ready to start something new?</h3>
-              <p className="text-gray-500 text-sm max-w-sm mb-6">Create a new workspace or import projects from Trello, Asana, or Jira to get started.</p>
-              <div className="flex gap-3 mt-2">
-                <Link to="/projects/new" className="bg-[#0d6efd] hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold transition-all shadow-sm hover:scale-105 hover:shadow-lg active:scale-95">
-                  Create New Project
+            ) : projects.length === 0 ? (
+              <div className="rounded-[34px] border-2 border-dashed border-[#cfdae7] bg-white/70 px-10 py-16 text-center">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#eef4fa] text-[#0f4fe6]">
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                  </svg>
+                </div>
+                <h2 className="mt-6 text-[24px] font-extrabold text-[#162231]">No projects yet</h2>
+                <p className="mx-auto mt-3 max-w-[520px] text-[15px] font-medium leading-7 text-[#5b6b80]">
+                  Start by creating a project. Boards, lists, and delivery workflows will live underneath it.
+                </p>
+                <Link to="/projects/new" className="mt-8 inline-flex items-center gap-3 rounded-2xl bg-[#0f4fe6] px-7 py-4 text-[16px] font-bold text-white shadow-[0_16px_32px_rgba(15,79,230,0.24)]">
+                  Create Project
                 </Link>
-                <button className="bg-white hover:bg-gray-50 text-gray-700 px-6 py-2.5 rounded-lg text-sm font-bold transition-all border border-gray-200 hover:border-gray-300 hover:shadow-sm">
-                  Import Data
-                </button>
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="mb-8 grid gap-6 md:grid-cols-3">
+                  <section className="rounded-[30px] bg-[#eef4fa] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                    <p className="text-[13px] font-extrabold tracking-[0.15em] text-[#4e5f74]">TOTAL PROJECTS</p>
+                    <p className="mt-4 text-[52px] font-extrabold leading-none tracking-tight text-[#162231]">{projects.length}</p>
+                  </section>
+                  <section className="rounded-[30px] bg-[#eef4fa] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                    <p className="text-[13px] font-extrabold tracking-[0.15em] text-[#4e5f74]">ACTIVE NOW</p>
+                    <p className="mt-4 text-[52px] font-extrabold leading-none tracking-tight text-[#162231]">
+                      {projects.filter((project) => project.status === 'active').length}
+                    </p>
+                  </section>
+                  <section className="rounded-[30px] bg-[#eef4fa] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                    <p className="text-[13px] font-extrabold tracking-[0.15em] text-[#4e5f74]">BOARDS LINKED</p>
+                    <p className="mt-4 text-[52px] font-extrabold leading-none tracking-tight text-[#162231]">
+                      {projects.reduce((sum, project) => sum + (project.boards?.length || 0), 0)}
+                    </p>
+                  </section>
+                </div>
 
+                <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                  {projects.map((project: Project) => {
+                    const priorityClass = priorityClasses[project.priority || 'medium'] || priorityClasses.medium;
+                    const statusClass = statusClasses[project.status || 'planning'] || statusClasses.planning;
+                    const boardCount = project.boards?.length || 0;
+                    const accentColor = project.color || '#0f4fe6';
+
+                    return (
+                      <Link
+                        key={project.id}
+                        to={`/projects/${project.id}`}
+                        className="rounded-[30px] bg-white p-8 shadow-[0_16px_34px_rgba(16,24,40,0.06)] transition hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(16,24,40,0.09)]"
+                      >
+                        <div className="mb-7 flex items-start justify-between gap-4">
+                          <div className="flex items-center gap-4">
+                            <div
+                              className="flex h-[64px] w-[64px] items-center justify-center rounded-[24px] text-[22px] font-extrabold text-white shadow-sm"
+                              style={{ backgroundColor: accentColor }}
+                            >
+                              {project.title.slice(0, 1).toUpperCase()}
+                            </div>
+                            <div>
+                              <h3 className="text-[20px] font-extrabold text-[#162231]">{project.title}</h3>
+                              <p className="mt-1 text-[14px] font-medium text-[#5b6b80]">{project.owner?.nickname || project.owner?.username || 'Owner'}</p>
+                            </div>
+                          </div>
+                          <div className="space-y-2 text-right">
+                            <span className={`inline-flex rounded-xl px-3 py-1.5 text-[12px] font-bold ${priorityClass}`}>
+                              {(project.priority || 'medium').toUpperCase()}
+                            </span>
+                            <div className={`rounded-xl px-3 py-1.5 text-[12px] font-bold ${statusClass}`}>
+                              {(project.status || 'planning').toUpperCase()}
+                            </div>
+                          </div>
+                        </div>
+
+                        <p className="mb-8 min-h-[72px] text-[14px] font-medium leading-7 text-[#5b6b80]">
+                          {project.description || 'No description yet.'}
+                        </p>
+
+                        <div className="mb-6 grid grid-cols-2 gap-4">
+                          <div className="rounded-[22px] bg-[#eef4fa] px-5 py-4">
+                            <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#4e5f74]">Boards</div>
+                            <div className="mt-3 text-[28px] font-extrabold text-[#162231]">{boardCount}</div>
+                          </div>
+                          <div className="rounded-[22px] bg-[#eef4fa] px-5 py-4">
+                            <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#4e5f74]">Target</div>
+                            <div className="mt-3 text-[16px] font-extrabold text-[#162231]">{project.target_date || 'Not set'}</div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[13px] font-semibold text-[#5b6b80]">
+                          <span>Start {project.start_date || 'TBD'}</span>
+                          <span>Open Project</span>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </main>

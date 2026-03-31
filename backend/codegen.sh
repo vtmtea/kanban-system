@@ -1,0 +1,1 @@
+oapi-codegen -config oapi-codegen.yaml ../openapi.yaml

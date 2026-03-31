@@ -1,11 +1,14 @@
-import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { boardApi } from '@/services/api';
+import { useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { SelectField } from '@/components/SelectField';
+import { boardApi, projectApi } from '@/services/api';
 import type { CreateBoardRequest } from '@/types';
 
 interface CreateBoardModalProps {
   isOpen: boolean;
   onClose: () => void;
+  projectId?: number;
+  onCreated?: (boardId: number) => void;
 }
 
 const colors = [
@@ -19,9 +22,11 @@ const colors = [
   { name: '青色', value: '#06B6D4' },
 ];
 
-export function CreateBoardModal({ isOpen, onClose }: CreateBoardModalProps) {
+export function CreateBoardModal({ isOpen, onClose, projectId, onCreated }: CreateBoardModalProps) {
   const queryClient = useQueryClient();
+  const hasFixedProject = projectId !== undefined;
   const [form, setForm] = useState<CreateBoardRequest>({
+    project_id: projectId,
     title: '',
     description: '',
     color: '#3B82F6',
@@ -29,10 +34,48 @@ export function CreateBoardModal({ isOpen, onClose }: CreateBoardModalProps) {
   });
   const [error, setError] = useState('');
 
+  const { data: projectsResponse } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => projectApi.getAll(),
+    enabled: isOpen && !hasFixedProject,
+  });
+
+  const projectOptions = useMemo(() => {
+    const options = [
+      {
+        label: 'Standalone Board',
+        value: 'none',
+        description: 'Create a board without attaching it to a project.',
+      },
+    ];
+
+    for (const project of projectsResponse?.data || []) {
+      options.push({
+        label: project.title,
+        value: String(project.id),
+        description: project.description || 'Attach this board to an existing project.',
+      });
+    }
+
+    return options;
+  }, [projectsResponse?.data]);
+
+  useEffect(() => {
+    setForm((current) => ({
+      ...current,
+      project_id: projectId,
+    }));
+  }, [projectId]);
+
   const createMutation = useMutation({
     mutationFn: (data: CreateBoardRequest) => boardApi.create(data),
-    onSuccess: () => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['boards'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+      }
+      onCreated?.(response.data.id);
       handleClose();
     },
     onError: (err: any) => {
@@ -41,7 +84,7 @@ export function CreateBoardModal({ isOpen, onClose }: CreateBoardModalProps) {
   });
 
   const handleClose = () => {
-    setForm({ title: '', description: '', color: '#3B82F6', is_public: false });
+    setForm({ project_id: projectId, title: '', description: '', color: '#3B82F6', is_public: false });
     setError('');
     onClose();
   };
@@ -52,7 +95,11 @@ export function CreateBoardModal({ isOpen, onClose }: CreateBoardModalProps) {
       setError('请输入看板标题');
       return;
     }
-    createMutation.mutate(form);
+
+    createMutation.mutate({
+      ...form,
+      project_id: hasFixedProject ? projectId : form.project_id,
+    });
   };
 
   if (!isOpen) return null;
@@ -125,6 +172,28 @@ export function CreateBoardModal({ isOpen, onClose }: CreateBoardModalProps) {
               ))}
             </div>
           </div>
+
+          {hasFixedProject ? (
+            <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
+              该看板会自动归属到当前 Project。
+            </div>
+          ) : (
+            <div className="mb-5">
+              <label className="mb-3 block text-sm font-medium text-gray-700">归属项目</label>
+              <SelectField
+                options={projectOptions}
+                value={form.project_id ? String(form.project_id) : 'none'}
+                onChange={(nextValue) =>
+                  setForm((current) => ({
+                    ...current,
+                    project_id: nextValue === 'none' ? undefined : Number(nextValue),
+                  }))
+                }
+                placeholder="选择一个项目"
+                size="lg"
+              />
+            </div>
+          )}
 
           {error && (
             <div className="text-red-500 text-sm mb-4">{error}</div>

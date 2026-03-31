@@ -1,38 +1,115 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { boardApi, swimlaneApi, webhookApi, transitionRuleApi, labelApi } from '@/services/api';
+import { boardApi, projectApi, swimlaneApi, webhookApi, transitionRuleApi, labelApi, userApi } from '@/services/api';
 import { AnalyticsDashboard } from '@/components/AnalyticsDashboard';
 import { SelectField } from '@/components/SelectField';
-import type { BoardMember, Swimlane, Webhook, ListTransitionRule, Label, List } from '@/types';
+import { useAuth } from '@/context/AuthContext';
+import type { BoardMember, Swimlane, Webhook, ListTransitionRule, Label, List, User } from '@/types';
 
 interface BoardSettingsModalProps {
   boardId: number;
   onClose: () => void;
+  onDeleted?: () => void;
 }
 
-export function BoardSettingsModal({ boardId, onClose }: BoardSettingsModalProps) {
-  const [activeSection, setActiveSection] = useState<string>('team');
+type ManageableMemberRole = 'admin' | 'member' | 'observer';
+
+const memberRoleOptions = [
+  { value: 'admin', label: 'Admin', description: 'Can manage members, settings, and board structure.' },
+  { value: 'member', label: 'Member', description: 'Can work on cards and collaborate on the board.' },
+  { value: 'observer', label: 'Observer', description: 'Can view board progress without making changes.' },
+];
+
+function getUserDisplayName(user?: User | null) {
+  return user?.nickname || user?.username || 'Unknown user';
+}
+
+function getUserInitial(user?: User | null) {
+  return getUserDisplayName(user).charAt(0).toUpperCase();
+}
+
+export function BoardSettingsModal({ boardId, onClose, onDeleted }: BoardSettingsModalProps) {
+  const [activeSection, setActiveSection] = useState<string>('general');
   const [ruleFromId, setRuleFromId] = useState('');
   const [ruleToId, setRuleToId] = useState('');
+  const [showInvitePanel, setShowInvitePanel] = useState(false);
+  const [inviteQuery, setInviteQuery] = useState('');
+  const [inviteRole, setInviteRole] = useState<ManageableMemberRole>('member');
+  const [boardForm, setBoardForm] = useState({
+    title: '',
+    description: '',
+    color: '#0d6efd',
+    is_public: false,
+    project_id: 'none',
+  });
+  const [generalError, setGeneralError] = useState('');
+  const [generalNotice, setGeneralNotice] = useState('');
+  const [memberError, setMemberError] = useState('');
+  const [memberNotice, setMemberNotice] = useState('');
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   // Queries
   const { data: board } = useQuery({ queryKey: ['board', boardId], queryFn: () => boardApi.getOne(boardId) });
+  const { data: projects } = useQuery({ queryKey: ['projects'], queryFn: () => projectApi.getAll() });
   const { data: members } = useQuery({ queryKey: ['board', boardId, 'members'], queryFn: () => boardApi.getMembers(boardId) });
   const { data: swimlanes } = useQuery({ queryKey: ['board', boardId, 'swimlanes'], queryFn: () => swimlaneApi.getAll(boardId) });
   const { data: labels } = useQuery({ queryKey: ['labels', boardId], queryFn: () => labelApi.getAll(boardId) });
   const { data: webhooks } = useQuery({ queryKey: ['board', boardId, 'webhooks'], queryFn: () => webhookApi.getAll(boardId) });
   const { data: rules } = useQuery({ queryKey: ['board', boardId, 'transition-rules'], queryFn: () => transitionRuleApi.getAll(boardId) });
+  const { data: inviteCandidatesData, isFetching: isSearchingUsers } = useQuery({
+    queryKey: ['users', 'search', boardId, inviteQuery],
+    queryFn: () =>
+      userApi.search({
+        q: inviteQuery.trim() || undefined,
+        limit: 8,
+        exclude_board_id: boardId,
+      }),
+    enabled: showInvitePanel,
+  });
 
   // Mutations
+  const addMemberMutation = useMutation({
+    mutationFn: (data: { userId: number; role: ManageableMemberRole }) =>
+      boardApi.addMember(boardId, { user_id: data.userId, role: data.role }),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['board', boardId, 'members'] });
+      queryClient.invalidateQueries({ queryKey: ['board', boardId] });
+      setMemberError('');
+      setMemberNotice(`${getUserDisplayName(response.data.user)} joined the board as ${response.data.role}.`);
+      setInviteQuery('');
+    },
+    onError: (error: any) => {
+      setMemberNotice('');
+      setMemberError(error.response?.data?.error || 'Failed to add member');
+    },
+  });
+
   const updateRoleMutation = useMutation({
     mutationFn: (data: { userId: number; role: 'admin' | 'member' | 'observer' }) => boardApi.updateMemberRole(boardId, data.userId, { role: data.role }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['board', boardId, 'members'] }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['board', boardId, 'members'] });
+      setMemberError('');
+      setMemberNotice('Member permissions updated.');
+    },
+    onError: (error: any) => {
+      setMemberNotice('');
+      setMemberError(error.response?.data?.error || 'Failed to update member role');
+    },
   });
 
   const removeMemberMutation = useMutation({
     mutationFn: (userId: number) => boardApi.removeMember(boardId, userId),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['board', boardId, 'members'] }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['board', boardId, 'members'] });
+      queryClient.invalidateQueries({ queryKey: ['board', boardId] });
+      setMemberError('');
+      setMemberNotice('Member removed from the board.');
+    },
+    onError: (error: any) => {
+      setMemberNotice('');
+      setMemberError(error.response?.data?.error || 'Failed to remove member');
+    },
   });
 
   const createSwimlaneMutation = useMutation({
@@ -81,12 +158,118 @@ export function BoardSettingsModal({ boardId, onClose }: BoardSettingsModalProps
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['board', boardId, 'transition-rules'] }); },
   });
 
+  const updateBoardMutation = useMutation({
+    mutationFn: () =>
+      boardApi.update(boardId, {
+        title: boardForm.title.trim(),
+        description: boardForm.description.trim() || '',
+        color: boardForm.color,
+        is_public: boardForm.is_public,
+        project_id: boardForm.project_id === 'none' ? 0 : Number(boardForm.project_id),
+      }),
+    onSuccess: (response) => {
+      const previousProjectId = board?.data.project_id;
+      const nextProjectId = response.data.project_id;
+
+      queryClient.invalidateQueries({ queryKey: ['board', boardId] });
+      queryClient.invalidateQueries({ queryKey: ['boards'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+
+      if (previousProjectId) {
+        queryClient.invalidateQueries({ queryKey: ['project', previousProjectId] });
+      }
+      if (nextProjectId) {
+        queryClient.invalidateQueries({ queryKey: ['project', nextProjectId] });
+      }
+
+      setGeneralError('');
+      setGeneralNotice('Board settings saved.');
+    },
+    onError: (error: any) => {
+      setGeneralNotice('');
+      setGeneralError(error.response?.data?.error || 'Failed to save board settings');
+    },
+  });
+
+  const deleteBoardMutation = useMutation({
+    mutationFn: () => boardApi.delete(boardId),
+    onSuccess: () => {
+      const projectId = board?.data.project_id;
+
+      queryClient.invalidateQueries({ queryKey: ['boards'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+      }
+
+      if (onDeleted) {
+        onDeleted();
+        return;
+      }
+
+      onClose();
+    },
+    onError: (error: any) => {
+      setGeneralNotice('');
+      setGeneralError(error.response?.data?.error || 'Failed to delete board');
+    },
+  });
+
   const boardData = board?.data;
   const lists = boardData?.lists || [];
+  const isBoardOwner = !!user && boardData?.owner_id === user.id;
+  const memberList = members?.data || [];
+  const currentBoardMember = memberList.find((member) => member.user_id === user?.id);
+  const canManageMembers = isBoardOwner || ['owner', 'admin'].includes(currentBoardMember?.role || '');
+
+  const projectOptions = useMemo(
+    () => [
+      { value: 'none', label: 'Standalone Board', description: 'Keep this board outside of any project.' },
+      ...((projects?.data || []).map((project) => ({
+        value: String(project.id),
+        label: project.title,
+        description: project.description || 'Move this board into the selected project.',
+      }))),
+    ],
+    [projects?.data]
+  );
+
+  const inviteCandidates = useMemo(() => {
+    const existingMemberIds = new Set(memberList.map((member) => member.user_id));
+    return (inviteCandidatesData?.data || []).filter((candidate) => !existingMemberIds.has(candidate.id));
+  }, [inviteCandidatesData?.data, memberList]);
+
+  useEffect(() => {
+    if (!boardData) return;
+
+    setBoardForm({
+      title: boardData.title || '',
+      description: boardData.description || '',
+      color: boardData.color || '#0d6efd',
+      is_public: !!boardData.is_public,
+      project_id: boardData.project_id ? String(boardData.project_id) : 'none',
+    });
+    setGeneralError('');
+    setGeneralNotice('');
+  }, [boardData]);
+
+  useEffect(() => {
+    setShowInvitePanel(false);
+    setInviteQuery('');
+    setInviteRole('member');
+    setMemberError('');
+    setMemberNotice('');
+  }, [boardId]);
 
   const scrollToSection = (id: string) => {
     setActiveSection(id);
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const openInvitePanel = () => {
+    if (!canManageMembers) return;
+    setShowInvitePanel(true);
+    scrollToSection('team');
   };
 
   // Static assets for mock visual design
@@ -160,7 +343,12 @@ export function BoardSettingsModal({ boardId, onClose }: BoardSettingsModalProps
           </div>
 
           <div className="px-8 mt-auto pt-8">
-            <button className="w-full flex items-center justify-center gap-2 bg-[#0d6efd] hover:bg-blue-700 text-white py-3 rounded-xl text-[13px] font-bold transition-all shadow-md active:scale-95 mb-8">
+            <button
+              type="button"
+              onClick={openInvitePanel}
+              disabled={!canManageMembers}
+              className="mb-8 flex w-full items-center justify-center gap-2 rounded-xl bg-[#0d6efd] py-3 text-[13px] font-bold text-white shadow-md transition-all hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+            >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
               Invite Member
             </button>
@@ -187,6 +375,10 @@ export function BoardSettingsModal({ boardId, onClose }: BoardSettingsModalProps
                  <p className="text-gray-500 text-[13px] font-medium leading-relaxed mb-10">Manage your workspace preferences, labels, automations and team permissions.</p>
 
                  <div className="bg-white rounded-xl py-3 px-2 shadow-sm border border-gray-100">
+                    <button onClick={() => scrollToSection('general')} className={`w-full flex items-center gap-3 px-4 py-2 text-[14px] font-bold rounded-lg transition-colors ${activeSection === 'general' ? 'bg-[#f4f6f8] text-[#0d6efd]' : 'text-gray-500 hover:bg-gray-50'}`}>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h16M4 17h10" /></svg>
+                        General
+                    </button>
                     <button onClick={() => scrollToSection('team')} className={`w-full flex items-center gap-3 px-4 py-2 text-[14px] font-bold rounded-lg transition-colors ${activeSection === 'team' ? 'bg-[#f4f6f8] text-[#0d6efd]' : 'text-gray-500 hover:bg-gray-50'}`}>
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                         Team
@@ -216,6 +408,139 @@ export function BoardSettingsModal({ boardId, onClose }: BoardSettingsModalProps
                    </div>
                  ) : (
                    <>
+                     <div id="general" className="bg-white rounded-[1.5rem] p-8 lg:p-10 shadow-sm border border-gray-100">
+                        <div className="flex items-start justify-between gap-6 mb-8">
+                           <div>
+                              <h3 className="text-xl font-extrabold text-gray-900 mb-1.5 tracking-tight">Board Basics</h3>
+                              <p className="text-[13px] text-gray-500 font-medium">Update the board title, project placement, visibility, and identity color.</p>
+                           </div>
+                           <div className="rounded-2xl border border-gray-100 bg-[#f8fafc] px-4 py-3 text-right">
+                              <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-gray-400">Owner</div>
+                              <div className="mt-1 text-[14px] font-bold text-gray-900">
+                                 {boardData?.owner?.nickname || boardData?.owner?.username || 'Unknown'}
+                              </div>
+                           </div>
+                        </div>
+
+                        {generalError ? (
+                          <div className="mb-5 rounded-xl border border-[#ffd7d7] bg-[#fff5f5] px-4 py-3 text-sm font-semibold text-[#b42318]">
+                            {generalError}
+                          </div>
+                        ) : null}
+
+                        {generalNotice ? (
+                          <div className="mb-5 rounded-xl border border-[#d4f0dd] bg-[#edf9f1] px-4 py-3 text-sm font-semibold text-[#027a48]">
+                            {generalNotice}
+                          </div>
+                        ) : null}
+
+                        <div className="grid gap-6 md:grid-cols-2">
+                           <label className="block md:col-span-2">
+                              <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Board Name</span>
+                              <input
+                                type="text"
+                                value={boardForm.title}
+                                onChange={(event) => setBoardForm((current) => ({ ...current, title: event.target.value }))}
+                                className="h-14 w-full rounded-2xl border border-[#d9e3ef] bg-white px-5 text-[15px] font-semibold text-[#162231] outline-none transition focus:border-[#b7cbe0]"
+                              />
+                           </label>
+
+                           <label className="block md:col-span-2">
+                              <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Description</span>
+                              <textarea
+                                rows={4}
+                                value={boardForm.description}
+                                onChange={(event) => setBoardForm((current) => ({ ...current, description: event.target.value }))}
+                                className="w-full rounded-[24px] border border-[#d9e3ef] bg-white px-5 py-4 text-[15px] font-medium leading-7 text-[#162231] outline-none transition focus:border-[#b7cbe0]"
+                              />
+                           </label>
+
+                           <div className="block">
+                              <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Linked Project</span>
+                              <SelectField
+                                size="lg"
+                                value={boardForm.project_id}
+                                onChange={(nextValue) => setBoardForm((current) => ({ ...current, project_id: nextValue }))}
+                                options={projectOptions}
+                              />
+                           </div>
+
+                           <div className="block">
+                              <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Visibility</span>
+                              <div className="flex items-center justify-between rounded-2xl border border-[#d9e3ef] bg-white px-5 py-4">
+                                <div>
+                                  <div className="text-[15px] font-semibold text-[#162231]">
+                                    {boardForm.is_public ? 'Public board' : 'Private board'}
+                                  </div>
+                                  <div className="mt-1 text-[12px] font-medium text-[#6b7b90]">
+                                    {boardForm.is_public ? 'Visible to anyone with workspace access.' : 'Visible only to board members.'}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setBoardForm((current) => ({ ...current, is_public: !current.is_public }))}
+                                  className={`relative h-8 w-14 rounded-full transition ${boardForm.is_public ? 'bg-[#0f4fe6]' : 'bg-[#d7e1ec]'}`}
+                                >
+                                  <span
+                                    className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition ${boardForm.is_public ? 'left-7' : 'left-1'}`}
+                                  />
+                                </button>
+                              </div>
+                           </div>
+
+                           <div className="block">
+                              <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Accent Color</span>
+                              <div className="flex items-center gap-4 rounded-2xl border border-[#d9e3ef] bg-white px-5 py-4">
+                                <input
+                                  type="color"
+                                  value={boardForm.color}
+                                  onChange={(event) => setBoardForm((current) => ({ ...current, color: event.target.value }))}
+                                  className="h-12 w-14 cursor-pointer rounded-xl border-0 bg-transparent p-0"
+                                />
+                                <div>
+                                  <div className="text-[15px] font-semibold text-[#162231]">{boardForm.color}</div>
+                                  <div className="mt-1 text-[12px] font-medium text-[#6b7b90]">Used across cards and board entry points.</div>
+                                </div>
+                              </div>
+                           </div>
+
+                           <div className="block">
+                              <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Board ID</span>
+                              <div className="flex h-[88px] items-center rounded-2xl border border-[#d9e3ef] bg-[#f8fafc] px-5">
+                                <div>
+                                  <div className="text-[15px] font-semibold text-[#162231]">#{boardId}</div>
+                                  <div className="mt-1 text-[12px] font-medium text-[#6b7b90]">Reference this ID for automations and integrations.</div>
+                                </div>
+                              </div>
+                           </div>
+                        </div>
+
+                        {isBoardOwner ? (
+                          <div className="mt-8 rounded-[24px] border border-[#ffd7d7] bg-[#fff8f8] p-6">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                              <div>
+                                <h4 className="text-[16px] font-extrabold text-[#b42318]">Danger Zone</h4>
+                                <p className="mt-2 text-[13px] font-medium leading-6 text-[#7a3b3b]">
+                                  Deleting the board will remove its lists, cards, and board-level setup from the workspace.
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={deleteBoardMutation.isPending}
+                                onClick={() => {
+                                  if (window.confirm(`Delete board "${boardData?.title || boardForm.title}"? This cannot be undone.`)) {
+                                    deleteBoardMutation.mutate();
+                                  }
+                                }}
+                                className="inline-flex items-center justify-center rounded-2xl bg-[#b42318] px-5 py-3 text-[14px] font-bold text-white transition hover:bg-[#9f1c12] disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {deleteBoardMutation.isPending ? 'Deleting...' : 'Delete Board'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
+                     </div>
+
                      {/* Team Management */}
                      <div id="team" className="bg-white rounded-[1.5rem] p-8 lg:p-10 shadow-sm border border-gray-100">
                         <div className="flex items-center justify-between mb-8">
@@ -223,42 +548,182 @@ export function BoardSettingsModal({ boardId, onClose }: BoardSettingsModalProps
                               <h3 className="text-xl font-extrabold text-gray-900 mb-1.5 tracking-tight">Team Management</h3>
                               <p className="text-[13px] text-gray-500 font-medium">Invite and manage roles for your workspace members.</p>
                            </div>
-                           <button className="px-5 py-2.5 bg-[#0d6efd] text-white rounded-xl text-sm font-bold shadow-md hover:bg-blue-700 active:scale-95 transition-all flex items-center gap-2">
+                           <button
+                             type="button"
+                             onClick={openInvitePanel}
+                             disabled={!canManageMembers}
+                             className="flex items-center gap-2 rounded-xl bg-[#0d6efd] px-5 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                           >
                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
                              Invite Member
                            </button>
                         </div>
+
+                        {!canManageMembers ? (
+                          <div className="mb-6 rounded-2xl border border-gray-100 bg-[#f8fafc] px-5 py-4 text-sm font-medium text-gray-500">
+                            Only board owners and admins can invite teammates or change member roles.
+                          </div>
+                        ) : null}
+
+                        {memberError ? (
+                          <div className="mb-5 rounded-xl border border-[#ffd7d7] bg-[#fff5f5] px-4 py-3 text-sm font-semibold text-[#b42318]">
+                            {memberError}
+                          </div>
+                        ) : null}
+
+                        {memberNotice ? (
+                          <div className="mb-5 rounded-xl border border-[#d4f0dd] bg-[#edf9f1] px-4 py-3 text-sm font-semibold text-[#027a48]">
+                            {memberNotice}
+                          </div>
+                        ) : null}
+
+                        {showInvitePanel && canManageMembers ? (
+                          <div className="mb-8 rounded-[1.75rem] border border-[#dbe7fb] bg-[#f8fbff] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div>
+                                <h4 className="text-[16px] font-extrabold text-gray-900">Add Existing User To Board</h4>
+                                <p className="mt-1 text-[13px] font-medium text-gray-500">
+                                  Search by username, nickname, or email. This adds the user directly to the board.
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowInvitePanel(false);
+                                  setInviteQuery('');
+                                }}
+                                className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-600 transition hover:bg-gray-50"
+                              >
+                                Close
+                              </button>
+                            </div>
+
+                            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
+                              <input
+                                type="text"
+                                value={inviteQuery}
+                                onChange={(event) => {
+                                  setInviteQuery(event.target.value);
+                                  setMemberError('');
+                                  setMemberNotice('');
+                                }}
+                                placeholder="Search teammates by name or email"
+                                className="h-14 rounded-2xl border border-[#d9e3ef] bg-white px-5 text-[15px] font-semibold text-[#162231] outline-none transition placeholder:text-[#7b8ba2] focus:border-[#b7cbe0]"
+                              />
+                              <SelectField
+                                size="lg"
+                                value={inviteRole}
+                                onChange={(value) => setInviteRole(value as ManageableMemberRole)}
+                                options={memberRoleOptions}
+                              />
+                            </div>
+
+                            <div className="mt-5 space-y-3">
+                              {isSearchingUsers ? (
+                                <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-6 text-center text-sm font-medium text-gray-400">
+                                  Searching workspace users...
+                                </div>
+                              ) : inviteCandidates.length ? (
+                                inviteCandidates.map((candidate) => (
+                                  <div
+                                    key={candidate.id}
+                                    className="flex flex-col gap-4 rounded-2xl border border-white/80 bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                                  >
+                                    <div className="flex items-center gap-4">
+                                      {candidate.avatar ? (
+                                        <img
+                                          src={candidate.avatar}
+                                          alt={getUserDisplayName(candidate)}
+                                          className="h-11 w-11 rounded-xl object-cover shadow-sm"
+                                        />
+                                      ) : (
+                                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-[13px] font-extrabold text-white shadow-sm">
+                                          {getUserInitial(candidate)}
+                                        </div>
+                                      )}
+                                      <div>
+                                        <div className="font-extrabold text-gray-900 text-[14px]">{getUserDisplayName(candidate)}</div>
+                                        <div className="text-[12px] text-gray-400 font-medium mt-0.5">
+                                          {candidate.email || candidate.username}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => addMemberMutation.mutate({ userId: candidate.id, role: inviteRole })}
+                                      disabled={addMemberMutation.isPending}
+                                      className="inline-flex items-center justify-center rounded-xl bg-[#0d6efd] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      {addMemberMutation.isPending ? 'Adding...' : `Add as ${memberRoleOptions.find((option) => option.value === inviteRole)?.label}`}
+                                    </button>
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-5 py-6 text-center text-sm font-medium text-gray-400">
+                                  {inviteQuery.trim()
+                                    ? 'No matching users found outside this board.'
+                                    : 'Start typing to search the workspace, or choose from the latest users shown here.'}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
                         
                         <div className="space-y-4">
-                           {members?.data?.map((member: BoardMember, i: number) => {
-                             const name = member.user?.nickname || member.user?.username || 'Unknown';
+                           {members?.data?.map((member: BoardMember) => {
+                             const name = getUserDisplayName(member.user);
                              return (
                                <div key={member.id} className="flex items-center justify-between group py-3 pr-2 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 -mx-4 px-4 rounded-xl transition-colors">
                                   <div className="flex items-center gap-4">
-                                     <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-[13px] font-extrabold shadow-sm overflow-hidden">
-                                        {i === 0 ? <img src="https://i.pravatar.cc/150?img=3" alt="ava" className="w-full h-full object-cover"/> : name[0].toUpperCase()}
-                                     </div>
+                                     {member.user?.avatar ? (
+                                       <img
+                                         src={member.user.avatar}
+                                         alt={name}
+                                         className="h-11 w-11 rounded-xl object-cover shadow-sm"
+                                       />
+                                     ) : (
+                                       <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-[13px] font-extrabold shadow-sm">
+                                          {getUserInitial(member.user)}
+                                       </div>
+                                     )}
                                      <div>
                                         <div className="font-extrabold text-gray-900 text-[14px]">{name}</div>
-                                        <div className="text-[12px] text-gray-400 font-medium mt-0.5">{name.toLowerCase().replace(' ', '.')}@kineticcore.io</div>
+                                        <div className="text-[12px] text-gray-400 font-medium mt-0.5">{member.user?.email || `User #${member.user_id}`}</div>
                                      </div>
                                   </div>
                                   
                                   <div className="flex items-center gap-4">
-                                     <SelectField
-                                        size="pill"
-                                        value={member.role}
-                                        align="right"
-                                        onChange={(nextValue) => updateRoleMutation.mutate({ userId: member.user_id, role: nextValue as 'admin' | 'member' | 'observer' })}
-                                        options={[
-                                          { value: 'admin', label: 'Admin' },
-                                          { value: 'member', label: 'Member' },
-                                          { value: 'observer', label: 'Observer' },
-                                        ]}
-                                     />
+                                     {member.role === 'owner' ? (
+                                       <span className="rounded-full bg-amber-50 px-4 py-2 text-[10px] font-extrabold uppercase tracking-[0.18em] text-amber-700">
+                                         Owner
+                                       </span>
+                                     ) : (
+                                       <SelectField
+                                          size="pill"
+                                          value={member.role}
+                                          align="right"
+                                          onChange={(nextValue) => {
+                                            setMemberError('');
+                                            setMemberNotice('');
+                                            updateRoleMutation.mutate({ userId: member.user_id, role: nextValue as ManageableMemberRole });
+                                          }}
+                                          options={memberRoleOptions}
+                                          disabled={!canManageMembers || updateRoleMutation.isPending}
+                                       />
+                                     )}
                                      
-                                     {member.role !== 'owner' && (
-                                       <button onClick={() => removeMemberMutation.mutate(member.user_id)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                                     {member.role !== 'owner' && canManageMembers && (
+                                       <button
+                                         type="button"
+                                         disabled={removeMemberMutation.isPending}
+                                         onClick={() => {
+                                           setMemberError('');
+                                           setMemberNotice('');
+                                           removeMemberMutation.mutate(member.user_id);
+                                         }}
+                                         className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                       >
                                           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
                                        </button>
                                      )}
@@ -471,7 +936,27 @@ export function BoardSettingsModal({ boardId, onClose }: BoardSettingsModalProps
            <div className="fixed bottom-0 right-0 left-[280px] p-6 bg-gradient-to-t from-white via-white to-transparent pt-12 flex justify-end gap-3 z-20 pointer-events-none">
               <div className="pointer-events-auto flex items-center gap-4 bg-white px-6 py-4 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.08)] border border-gray-100">
                  <button onClick={onClose} className="text-[13px] font-bold text-gray-600 hover:text-gray-900 mr-2">Discard Changes</button>
-                 <button onClick={onClose} className="px-6 py-2.5 bg-[#0d6efd] text-white rounded-xl font-bold shadow-md hover:bg-blue-700 active:scale-95 transition-all text-sm">Save Preferences</button>
+                 <button
+                   onClick={() => {
+                     if (activeSection === 'general') {
+                       if (!boardForm.title.trim()) {
+                         setGeneralNotice('');
+                         setGeneralError('Board name is required');
+                         return;
+                       }
+                       updateBoardMutation.mutate();
+                       return;
+                     }
+
+                     onClose();
+                   }}
+                   disabled={!boardData || updateBoardMutation.isPending}
+                   className="px-6 py-2.5 bg-[#0d6efd] text-white rounded-xl font-bold shadow-md hover:bg-blue-700 active:scale-95 transition-all text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                 >
+                   {activeSection === 'general'
+                     ? (updateBoardMutation.isPending ? 'Saving...' : 'Save Board')
+                     : 'Done'}
+                 </button>
               </div>
            </div>
         </main>

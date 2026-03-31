@@ -10,6 +10,7 @@ import (
 func AutoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&User{},
+		&Project{},
 		&Board{},
 		&Swimlane{},
 		&List{},
@@ -36,6 +37,18 @@ func (u *User) BeforeCreate(tx *gorm.DB) error {
 
 func (u *User) BeforeUpdate(tx *gorm.DB) error {
 	u.UpdatedAt = time.Now()
+	return nil
+}
+
+// Project hooks
+func (p *Project) BeforeCreate(tx *gorm.DB) error {
+	p.CreatedAt = time.Now()
+	p.UpdatedAt = time.Now()
+	return nil
+}
+
+func (p *Project) BeforeUpdate(tx *gorm.DB) error {
+	p.UpdatedAt = time.Now()
 	return nil
 }
 
