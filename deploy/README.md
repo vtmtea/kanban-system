@@ -140,6 +140,10 @@ ssh user@server "sudo systemctl restart kanban-backend"
 ```bash
 cd frontend
 
+# 启用与仓库一致的 pnpm 9
+corepack enable
+corepack prepare pnpm@9 --activate
+
 # 安装依赖
 pnpm install
 

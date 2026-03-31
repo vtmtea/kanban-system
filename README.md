@@ -95,6 +95,10 @@ go run cmd/server/main.go
 ```bash
 cd frontend
 
+# 启用与仓库一致的 pnpm 9
+corepack enable
+corepack prepare pnpm@9 --activate
+
 # 安装依赖
 pnpm install
 
@@ -183,6 +187,8 @@ cd backend
 
 # 前端 - 生成 TypeScript 类型
 cd frontend
+corepack enable
+corepack prepare pnpm@9 --activate
 pnpm run generate:api
 ```
 
