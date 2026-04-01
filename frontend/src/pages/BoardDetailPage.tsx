@@ -791,6 +791,10 @@ export function BoardDetailPage() {
           boardId={boardId}
           onClose={() => setShowSettings(false)}
           onDeleted={() => navigate('/boards')}
+          onLeftBoard={() => {
+            setShowSettings(false);
+            navigate('/boards');
+          }}
         />
       )}
       {showActivity && (

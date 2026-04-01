@@ -1488,6 +1488,28 @@ paths:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
 
+  /boards/{id}/leave:
+    post:
+      tags:
+        - member
+      summary: 离开看板
+      operationId: leaveBoard
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
   # 活动日志接口
   /boards/{id}/activities:
     get:

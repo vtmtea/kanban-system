@@ -117,6 +117,7 @@ export const boardApi = {
   updateMemberRole: (id: number, userId: number, data: UpdateMemberRoleRequest) =>
     api.put<BoardMember>(`/boards/${id}/members/${userId}`, data),
   removeMember: (id: number, userId: number) => api.delete(`/boards/${id}/members/${userId}`),
+  leave: (id: number) => api.post<MessageResponse>(`/boards/${id}/leave`),
   getActivities: (id: number, params?: { page?: number; limit?: number; entity_type?: string; action?: string }) =>
     api.get<ActivityListResponse>(`/boards/${id}/activities`, { params }),
   getWebhooks: (id: number) => api.get<Webhook[]>(`/boards/${id}/webhooks`),

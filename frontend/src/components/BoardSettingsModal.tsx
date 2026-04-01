@@ -10,6 +10,7 @@ interface BoardSettingsModalProps {
   boardId: number;
   onClose: () => void;
   onDeleted?: () => void;
+  onLeftBoard?: () => void;
 }
 
 type ManageableMemberRole = 'admin' | 'member' | 'observer';
@@ -30,7 +31,7 @@ function getUserInitial(user?: User | null) {
   return getUserDisplayName(user).charAt(0).toUpperCase();
 }
 
-export function BoardSettingsModal({ boardId, onClose, onDeleted }: BoardSettingsModalProps) {
+export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }: BoardSettingsModalProps) {
   const [activeSection, setActiveSection] = useState<string>('general');
   const [ruleFromId, setRuleFromId] = useState('');
   const [ruleToId, setRuleToId] = useState('');
@@ -312,6 +313,31 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted }: BoardSetting
     onError: (error: any) => {
       setGeneralNotice('');
       setGeneralError(error.response?.data?.error || 'Failed to delete board');
+    },
+  });
+
+  const leaveBoardMutation = useMutation({
+    mutationFn: () => boardApi.leave(boardId),
+    onSuccess: () => {
+      const projectId = board?.data.project_id;
+
+      queryClient.removeQueries({ queryKey: ['board', boardId] });
+      queryClient.invalidateQueries({ queryKey: ['boards'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+      }
+
+      if (onLeftBoard) {
+        onLeftBoard();
+        return;
+      }
+
+      onClose();
+    },
+    onError: (error: any) => {
+      setMemberNotice('');
+      setMemberError(error.response?.data?.error || 'Failed to leave board');
     },
   });
 
@@ -853,6 +879,31 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted }: BoardSetting
                              );
                            })}
                         </div>
+
+                        {currentBoardMember && !isBoardOwner ? (
+                          <div className="mt-8 rounded-[24px] border border-[#ffe1b3] bg-[#fff9ef] p-6">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                              <div>
+                                <h4 className="text-[16px] font-extrabold text-[#b54708]">Leave Board</h4>
+                                <p className="mt-2 text-[13px] font-medium leading-6 text-[#8f5b1a]">
+                                  Leave this board if you no longer need access. An owner or admin can add you back later if needed.
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={leaveBoardMutation.isPending}
+                                onClick={() => {
+                                  if (window.confirm(`Leave board "${boardData?.title || boardForm.title}"? You will lose access immediately.`)) {
+                                    leaveBoardMutation.mutate();
+                                  }
+                                }}
+                                className="inline-flex items-center justify-center rounded-2xl bg-[#f79009] px-5 py-3 text-[14px] font-bold text-white transition hover:bg-[#dc6803] disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {leaveBoardMutation.isPending ? 'Leaving...' : 'Leave Board'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
                      </div>
 
                      {/* Swimlanes */}
