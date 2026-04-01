@@ -91,6 +91,13 @@ export function BoardDetailPage() {
     enabled: !!board?.data,
   });
 
+  const { data: onlineUsers } = useQuery({
+    queryKey: ['board', boardId, 'online-users'],
+    queryFn: () => boardApi.getOnlineUsers(boardId),
+    enabled: !!board?.data,
+    refetchInterval: 15000,
+  });
+
   useWebSocket({
     boardId,
     enabled: !isLoading && !!board?.data,
@@ -326,6 +333,8 @@ export function BoardDetailPage() {
   const memberPreview = boardData.members?.slice(0, 3) || [];
   const extraMemberCount = Math.max(0, (boardData.members?.length || 0) - memberPreview.length);
   const projectTitle = boardProject?.data?.title || (boardData.project_id ? `Project #${boardData.project_id}` : 'Standalone Board');
+  const onlineUserIds = new Set(onlineUsers?.data.users || []);
+  const onlineCount = onlineUsers?.data.online_count || 0;
 
   const getListSections = (list: List): LaneSection[] =>
     boardSections.map((section) => ({
@@ -373,6 +382,9 @@ export function BoardDetailPage() {
                   {boardData.is_public ? 'Public' : 'Private'}
                 </span>
                 <span>{lists.length} Lists</span>
+                <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">
+                  {onlineCount} Online
+                </span>
               </div>
             </div>
 
@@ -380,21 +392,22 @@ export function BoardDetailPage() {
               {/* Avatars */}
               <div className="flex -space-x-2 mr-2">
                   {memberPreview.map((member) => (
-                    member.user?.avatar ? (
-                      <img
-                        key={member.id}
-                        className="w-8 h-8 rounded-full border-2 border-white object-cover"
-                        src={member.user.avatar}
-                        alt={member.user.nickname || member.user.username || 'Member'}
-                      />
-                    ) : (
-                      <div
-                        key={member.id}
-                        className="w-8 h-8 rounded-full border-2 border-white bg-[#0d6efd] flex items-center justify-center text-[11px] font-extrabold text-white"
-                      >
-                        {(member.user?.nickname || member.user?.username || '?').slice(0, 1).toUpperCase()}
-                      </div>
-                    )
+                    <div key={member.id} className="relative">
+                      {member.user?.avatar ? (
+                        <img
+                          className="w-8 h-8 rounded-full border-2 border-white object-cover"
+                          src={member.user.avatar}
+                          alt={member.user.nickname || member.user.username || 'Member'}
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full border-2 border-white bg-[#0d6efd] flex items-center justify-center text-[11px] font-extrabold text-white">
+                          {(member.user?.nickname || member.user?.username || '?').slice(0, 1).toUpperCase()}
+                        </div>
+                      )}
+                      {onlineUserIds.has(member.user_id) ? (
+                        <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500 shadow-sm" />
+                      ) : null}
+                    </div>
                   ))}
                   {extraMemberCount > 0 ? (
                     <div className="w-8 h-8 rounded-full border-2 border-white bg-gray-100 flex items-center justify-center text-[11px] font-extrabold text-gray-600">+{extraMemberCount}</div>

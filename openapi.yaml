@@ -1510,6 +1510,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
 
+  /boards/{id}/online-users:
+    get:
+      tags:
+        - member
+      summary: 获取看板在线用户
+      operationId: getBoardOnlineUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+
   # 活动日志接口
   /boards/{id}/activities:
     get:

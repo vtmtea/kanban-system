@@ -50,6 +50,11 @@ import type {
   MessageResponse,
 } from '@/types';
 
+export interface BoardOnlineUsersResponse {
+  online_count: number;
+  users: number[];
+}
+
 // 动态获取 API 基础路径
 // 开发环境: /api (由 Vite 代理转发)
 // 生产环境: 由环境变量 VITE_API_BASE_URL 配置
@@ -120,6 +125,7 @@ export const boardApi = {
   leave: (id: number) => api.post<MessageResponse>(`/boards/${id}/leave`),
   getActivities: (id: number, params?: { page?: number; limit?: number; entity_type?: string; action?: string }) =>
     api.get<ActivityListResponse>(`/boards/${id}/activities`, { params }),
+  getOnlineUsers: (id: number) => api.get<BoardOnlineUsersResponse>(`/boards/${id}/online-users`),
   getWebhooks: (id: number) => api.get<Webhook[]>(`/boards/${id}/webhooks`),
   createWebhook: (id: number, data: CreateWebhookRequest) => api.post<Webhook>(`/boards/${id}/webhooks`, data),
   getTransitionRules: (id: number) => api.get<ListTransitionRule[]>(`/boards/${id}/transition-rules`),
