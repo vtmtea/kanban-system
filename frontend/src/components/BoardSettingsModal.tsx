@@ -49,9 +49,12 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
   const [generalNotice, setGeneralNotice] = useState('');
   const [memberError, setMemberError] = useState('');
   const [memberNotice, setMemberNotice] = useState('');
+  const [listError, setListError] = useState('');
+  const [listNotice, setListNotice] = useState('');
   const [automationError, setAutomationError] = useState('');
   const [automationNotice, setAutomationNotice] = useState('');
   const [autoAssignmentDrafts, setAutoAssignmentDrafts] = useState<Record<number, string>>({});
+  const [listDrafts, setListDrafts] = useState<Record<number, { title: string; wipLimit: string }>>({});
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -145,6 +148,49 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['board', boardId, 'swimlanes'] });
       queryClient.invalidateQueries({ queryKey: ['board', boardId] });
+    },
+  });
+
+  const updateListMutation = useMutation({
+    mutationFn: (data: { listId: number; title: string; wipLimit: string }) => {
+      const payload = {
+        title: data.title.trim(),
+        wip_limit: data.wipLimit.trim() === '' ? null : Number(data.wipLimit),
+      };
+
+      return listApi.update(data.listId, payload);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['board', boardId] });
+      queryClient.invalidateQueries({ queryKey: ['board', boardId, 'wip-status'] });
+      setListError('');
+      setListNotice('List settings updated.');
+      setListDrafts((current) => ({
+        ...current,
+        [variables.listId]: {
+          title: variables.title.trim(),
+          wipLimit: variables.wipLimit.trim(),
+        },
+      }));
+    },
+    onError: (error: any) => {
+      setListNotice('');
+      setListError(error.response?.data?.error || 'Failed to update list');
+    },
+  });
+
+  const deleteListMutation = useMutation({
+    mutationFn: (listId: number) => listApi.delete(listId),
+    onSuccess: (response, listId) => {
+      queryClient.invalidateQueries({ queryKey: ['board', boardId] });
+      queryClient.invalidateQueries({ queryKey: ['board', boardId, 'wip-status'] });
+      queryClient.removeQueries({ queryKey: ['list', listId, 'auto-assignments'] });
+      setListError('');
+      setListNotice(response.data?.message || 'List deleted.');
+    },
+    onError: (error: any) => {
+      setListNotice('');
+      setListError(error.response?.data?.error || 'Failed to delete list');
     },
   });
 
@@ -393,8 +439,21 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
       is_public: !!boardData.is_public,
       project_id: boardData.project_id ? String(boardData.project_id) : 'none',
     });
+    setListDrafts(
+      Object.fromEntries(
+        (boardData.lists || []).map((list) => [
+          list.id,
+          {
+            title: list.title || '',
+            wipLimit: list.wip_limit == null ? '' : String(list.wip_limit),
+          },
+        ])
+      )
+    );
     setGeneralError('');
     setGeneralNotice('');
+    setListError('');
+    setListNotice('');
   }, [boardData]);
 
   useEffect(() => {
@@ -403,9 +462,12 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
     setInviteRole('member');
     setMemberError('');
     setMemberNotice('');
+    setListError('');
+    setListNotice('');
     setAutomationError('');
     setAutomationNotice('');
     setAutoAssignmentDrafts({});
+    setListDrafts({});
   }, [boardId]);
 
   const scrollToSection = (id: string) => {
@@ -529,6 +591,10 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
                     <button onClick={() => scrollToSection('team')} className={`w-full flex items-center gap-3 px-4 py-2 text-[14px] font-bold rounded-lg transition-colors ${activeSection === 'team' ? 'bg-[#f4f6f8] text-[#0d6efd]' : 'text-gray-500 hover:bg-gray-50'}`}>
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                         Team
+                    </button>
+                    <button onClick={() => scrollToSection('lists')} className={`w-full flex items-center gap-3 px-4 py-2 mt-1 text-[14px] font-bold rounded-lg transition-colors ${activeSection === 'lists' ? 'bg-[#f4f6f8] text-[#0d6efd]' : 'text-gray-500 hover:bg-gray-50'}`}>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h10M4 18h16" /></svg>
+                        Lists
                     </button>
                     <button onClick={() => scrollToSection('swimlanes')} className={`w-full flex items-center gap-3 px-4 py-2 mt-1 text-[14px] font-bold rounded-lg transition-colors ${activeSection === 'swimlanes' ? 'bg-[#f4f6f8] text-[#0d6efd]' : 'text-gray-500 hover:bg-gray-50'}`}>
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" /></svg>
@@ -904,6 +970,152 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
                             </div>
                           </div>
                         ) : null}
+                     </div>
+
+                     {/* Lists */}
+                     <div id="lists" className="bg-white rounded-[1.5rem] p-8 lg:p-10 shadow-sm border border-gray-100">
+                        <div className="mb-8">
+                           <h3 className="text-xl font-extrabold text-gray-900 mb-1.5 tracking-tight">Lists & WIP Rules</h3>
+                           <p className="text-[13px] text-gray-500 font-medium">Rename statuses, tune WIP limits, and remove obsolete lists without leaving the settings flow.</p>
+                        </div>
+
+                        {!canManageMembers ? (
+                          <div className="mb-6 rounded-2xl border border-gray-100 bg-[#f8fafc] px-5 py-4 text-sm font-medium text-gray-500">
+                            Only board owners and admins can edit list settings.
+                          </div>
+                        ) : null}
+
+                        {listError ? (
+                          <div className="mb-5 rounded-xl border border-[#ffd7d7] bg-[#fff5f5] px-4 py-3 text-sm font-semibold text-[#b42318]">
+                            {listError}
+                          </div>
+                        ) : null}
+
+                        {listNotice ? (
+                          <div className="mb-5 rounded-xl border border-[#d4f0dd] bg-[#edf9f1] px-4 py-3 text-sm font-semibold text-[#027a48]">
+                            {listNotice}
+                          </div>
+                        ) : null}
+
+                        <div className="space-y-4">
+                           {lists.length === 0 ? (
+                             <div className="rounded-2xl border border-dashed border-gray-200 bg-[#f8fafc] px-5 py-6 text-sm font-medium text-gray-500">
+                               No lists yet. Create your first list from the board view, then manage its settings here.
+                             </div>
+                           ) : (
+                             lists.map((list: List) => {
+                               const draft = listDrafts[list.id] || {
+                                 title: list.title || '',
+                                 wipLimit: list.wip_limit == null ? '' : String(list.wip_limit),
+                               };
+                               const trimmedTitle = draft.title.trim();
+                               const normalizedWipLimit = draft.wipLimit.trim();
+                               const currentWipLimit = list.wip_limit == null ? '' : String(list.wip_limit);
+                               const hasChanges = trimmedTitle !== list.title || normalizedWipLimit !== currentWipLimit;
+                               const invalidWipLimit =
+                                 normalizedWipLimit !== '' &&
+                                 (!Number.isInteger(Number(normalizedWipLimit)) || Number(normalizedWipLimit) < 1);
+                               const isSavingList =
+                                 updateListMutation.isPending &&
+                                 updateListMutation.variables?.listId === list.id;
+                               const isDeletingList =
+                                 deleteListMutation.isPending &&
+                                 deleteListMutation.variables === list.id;
+
+                               return (
+                                 <div key={list.id} className="rounded-2xl border border-gray-100 bg-[#fbfdff] p-5 shadow-sm">
+                                   <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_auto] lg:items-end">
+                                     <label className="block">
+                                       <span className="mb-3 block text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">List Name</span>
+                                       <input
+                                         type="text"
+                                         value={draft.title}
+                                         disabled={!canManageMembers || isSavingList || isDeletingList}
+                                         onChange={(event) =>
+                                           setListDrafts((current) => ({
+                                             ...current,
+                                             [list.id]: {
+                                               ...draft,
+                                               title: event.target.value,
+                                             },
+                                           }))
+                                         }
+                                         className="h-12 w-full rounded-2xl border border-[#d9e3ef] bg-white px-4 text-[14px] font-semibold text-[#162231] outline-none transition focus:border-[#b7cbe0] disabled:cursor-not-allowed disabled:opacity-60"
+                                       />
+                                     </label>
+
+                                     <label className="block">
+                                       <span className="mb-3 block text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">WIP Limit</span>
+                                       <input
+                                         type="number"
+                                         min={1}
+                                         placeholder="No limit"
+                                         value={draft.wipLimit}
+                                         disabled={!canManageMembers || isSavingList || isDeletingList}
+                                         onChange={(event) =>
+                                           setListDrafts((current) => ({
+                                             ...current,
+                                             [list.id]: {
+                                               ...draft,
+                                               wipLimit: event.target.value,
+                                             },
+                                           }))
+                                         }
+                                         className="h-12 w-full rounded-2xl border border-[#d9e3ef] bg-white px-4 text-[14px] font-semibold text-[#162231] outline-none transition focus:border-[#b7cbe0] disabled:cursor-not-allowed disabled:opacity-60"
+                                       />
+                                     </label>
+
+                                     <div className="flex items-center gap-3">
+                                       <button
+                                         type="button"
+                                         disabled={!canManageMembers || !hasChanges || invalidWipLimit || !trimmedTitle || isSavingList || isDeletingList}
+                                         onClick={() => {
+                                           if (!trimmedTitle) {
+                                             setListNotice('');
+                                             setListError('List name is required.');
+                                             return;
+                                           }
+                                           if (invalidWipLimit) {
+                                             setListNotice('');
+                                             setListError('WIP limit must be a whole number greater than 0.');
+                                             return;
+                                           }
+
+                                           updateListMutation.mutate({
+                                             listId: list.id,
+                                             title: draft.title,
+                                             wipLimit: draft.wipLimit,
+                                           });
+                                         }}
+                                         className="px-4 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-bold hover:bg-black transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                                       >
+                                         {isSavingList ? 'Saving...' : 'Save'}
+                                       </button>
+                                       <button
+                                         type="button"
+                                         disabled={!canManageMembers || isSavingList || isDeletingList}
+                                         onClick={() => {
+                                           if (window.confirm(`Delete list "${list.title}"? Cards inside this list will be removed as well.`)) {
+                                             deleteListMutation.mutate(list.id);
+                                           }
+                                         }}
+                                         className="px-4 py-2.5 rounded-xl bg-red-50 text-red-600 text-sm font-bold hover:bg-red-100 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                                       >
+                                         {isDeletingList ? 'Deleting...' : 'Delete'}
+                                       </button>
+                                     </div>
+                                   </div>
+
+                                   <div className="mt-3 text-[12px] font-medium text-[#6b7b90]">
+                                      {list.wip_limit == null
+                                        ? 'This list currently has no WIP limit.'
+                                        : `Current WIP limit: ${list.wip_limit} active cards.`}
+                                   </div>
+                                 </div>
+                               );
+                             })
+                           )}
+                        </div>
                      </div>
 
                      {/* Swimlanes */}
