@@ -688,15 +688,14 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
     scrollToSection('team');
   };
 
-  // Static assets for mock visual design
-  const defaultAva = "https://i.pravatar.cc/150?u=a04258114e29026702d";
+  const defaultAva = user?.avatar || 'https://i.pravatar.cc/150?u=board-settings-user';
 
   return (
     <div className="fixed inset-0 z-[150] bg-[#fbfcfd] flex flex-col font-sans animate-slide-up-fade">
       {/* Top Navbar */}
       <header className="h-[72px] bg-white flex items-center justify-between px-8 shrink-0 border-b border-gray-100 z-10 w-full">
         <div className="flex items-center gap-12 h-full">
-          <div className="font-extrabold text-[17px] text-gray-900 tracking-tight">The Fluid Architect</div>
+          <div className="font-extrabold text-[17px] text-gray-900 tracking-tight">{boardData?.title || 'Board Settings'}</div>
           <div className="flex items-end h-full mt-1.5">
             <a href="#" onClick={(e) => { e.preventDefault(); onClose(); }} className="text-gray-500 font-semibold pb-4 px-2 hover:text-gray-900 mr-6 transition-colors">Dashboard</a>
             <a href="#" onClick={(e) => { e.preventDefault(); onClose(); }} className="text-gray-500 font-semibold pb-4 px-2 hover:text-gray-900 mr-6 transition-colors">Boards</a>
@@ -729,8 +728,10 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
                 </svg>
               </div>
               <div>
-                <h2 className="font-extrabold text-[#0d6efd] leading-none text-[15px]">{boardData?.title || 'Project Alpha'}</h2>
-                <p className="text-[10px] text-gray-400 font-extrabold tracking-widest mt-1.5 uppercase">Premium Tier</p>
+                <h2 className="font-extrabold text-[#0d6efd] leading-none text-[15px]">{boardData?.title || 'Board Workspace'}</h2>
+                <p className="text-[10px] text-gray-400 font-extrabold tracking-widest mt-1.5 uppercase">
+                  {boardData?.is_public ? 'Public Board' : 'Private Board'}
+                </p>
               </div>
             </div>
 
