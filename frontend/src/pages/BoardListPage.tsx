@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Sidebar } from '@/components/Sidebar';
 import { TopNav } from '@/components/TopNav';
@@ -20,12 +21,30 @@ const statusClasses: Record<string, string> = {
 };
 
 export function BoardListPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [pageNotice, setPageNotice] = useState('');
   const { data, isLoading } = useQuery({
     queryKey: ['projects'],
     queryFn: () => projectApi.getAll(),
   });
 
   const projects = data?.data || [];
+
+  useEffect(() => {
+    const routeNotice =
+      location.state &&
+      typeof location.state === 'object' &&
+      'notice' in location.state &&
+      typeof location.state.notice === 'string'
+        ? location.state.notice
+        : '';
+
+    if (!routeNotice) return;
+
+    setPageNotice(routeNotice);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, location.state, navigate]);
 
   return (
     <div className="flex h-screen bg-[#eef4fa] font-sans text-[#162231]">
@@ -57,6 +76,19 @@ export function BoardListPage() {
                 </Link>
               </div>
             </div>
+
+            {pageNotice ? (
+              <div className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-[#d4f0dd] bg-[#edf9f1] px-5 py-4 text-[14px] font-semibold text-[#027a48]">
+                <span>{pageNotice}</span>
+                <button
+                  type="button"
+                  onClick={() => setPageNotice('')}
+                  className="text-[13px] font-extrabold text-[#027a48] transition hover:opacity-70"
+                >
+                  Dismiss
+                </button>
+              </div>
+            ) : null}
 
             {isLoading ? (
               <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">

@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Sidebar } from '@/components/Sidebar';
 import { TopNav } from '@/components/TopNav';
 import { projectApi } from '@/services/api';
 import { CreateBoardModal } from '@/components/CreateBoardModal';
+import { SelectField } from '@/components/SelectField';
+import { DatePickerField } from '@/components/DatePickerField';
+import { useAuth } from '@/context/AuthContext';
 
 const priorityClasses: Record<string, string> = {
   urgent: 'bg-[#ffe1e1] text-[#b42318]',
@@ -20,11 +23,39 @@ const statusClasses: Record<string, string> = {
   completed: 'bg-[#e8f5ec] text-[#027a48]',
 };
 
+const projectStatusOptions = [
+  { value: 'planning', label: 'Planning', description: 'Early shaping and scope definition.' },
+  { value: 'active', label: 'Active', description: 'Delivery work is in motion.' },
+  { value: 'on-hold', label: 'On Hold', description: 'Work is paused pending a decision or dependency.' },
+  { value: 'completed', label: 'Completed', description: 'The project has reached its intended outcome.' },
+];
+
+const projectPriorityOptions = [
+  { value: 'low', label: 'Low', description: 'Nice-to-have effort with flexible timing.' },
+  { value: 'medium', label: 'Medium', description: 'Important work with standard urgency.' },
+  { value: 'high', label: 'High', description: 'Important work that needs active attention.' },
+  { value: 'urgent', label: 'Urgent', description: 'Critical work that needs immediate focus.' },
+];
+
 export function ProjectDetailPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { id } = useParams<{ id: string }>();
   const projectId = Number(id);
   const [showCreateBoardModal, setShowCreateBoardModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [projectNotice, setProjectNotice] = useState('');
+  const [projectError, setProjectError] = useState('');
+  const [projectForm, setProjectForm] = useState({
+    title: '',
+    description: '',
+    color: '#0f4fe6',
+    start_date: '',
+    target_date: '',
+    status: 'planning',
+    priority: 'medium',
+  });
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['project', projectId],
@@ -36,6 +67,81 @@ export function ProjectDetailPage() {
   const boards = project?.boards || [];
   const priorityClass = priorityClasses[project?.priority || 'medium'] || priorityClasses.medium;
   const statusClass = statusClasses[project?.status || 'planning'] || statusClasses.planning;
+  const isOwner = !!user && project?.owner_id === user.id;
+  const hasProjectChanges =
+    !!project &&
+    (
+      projectForm.title.trim() !== project.title ||
+      projectForm.description.trim() !== (project.description || '') ||
+      projectForm.color !== (project.color || '#0f4fe6') ||
+      projectForm.start_date !== (project.start_date || '') ||
+      projectForm.target_date !== (project.target_date || '') ||
+      projectForm.status !== (project.status || 'planning') ||
+      projectForm.priority !== (project.priority || 'medium')
+    );
+
+  useEffect(() => {
+    if (!project) return;
+
+    setProjectForm({
+      title: project.title,
+      description: project.description || '',
+      color: project.color || '#0f4fe6',
+      start_date: project.start_date || '',
+      target_date: project.target_date || '',
+      status: project.status || 'planning',
+      priority: project.priority || 'medium',
+    });
+  }, [project]);
+
+  const updateProjectMutation = useMutation({
+    mutationFn: () =>
+      projectApi.update(projectId, {
+        title: projectForm.title.trim(),
+        description: projectForm.description.trim() || undefined,
+        color: projectForm.color,
+        start_date: projectForm.start_date || undefined,
+        target_date: projectForm.target_date || undefined,
+        status: projectForm.status,
+        priority: projectForm.priority,
+      }),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+      setProjectError('');
+      setProjectNotice('Project details updated.');
+      setIsEditing(false);
+      setProjectForm({
+        title: response.data.title,
+        description: response.data.description || '',
+        color: response.data.color || '#0f4fe6',
+        start_date: response.data.start_date || '',
+        target_date: response.data.target_date || '',
+        status: response.data.status || 'planning',
+        priority: response.data.priority || 'medium',
+      });
+    },
+    onError: (error: any) => {
+      setProjectNotice('');
+      setProjectError(error.response?.data?.error || 'Failed to update project');
+    },
+  });
+
+  const deleteProjectMutation = useMutation({
+    mutationFn: () => projectApi.delete(projectId),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      navigate('/projects', {
+        state: {
+          notice: response.data?.message || 'Project deleted.',
+        },
+      });
+    },
+    onError: (error: any) => {
+      setProjectNotice('');
+      setProjectError(error.response?.data?.error || 'Failed to delete project');
+    },
+  });
 
   return (
     <div className="flex h-screen bg-[#eef4fa] font-sans text-[#162231]">
@@ -96,6 +202,31 @@ export function ProjectDetailPage() {
                     </div>
 
                     <div className="flex items-center gap-3">
+                      {isOwner ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isEditing && project) {
+                              setProjectForm({
+                                title: project.title,
+                                description: project.description || '',
+                                color: project.color || '#0f4fe6',
+                                start_date: project.start_date || '',
+                                target_date: project.target_date || '',
+                                status: project.status || 'planning',
+                                priority: project.priority || 'medium',
+                              });
+                              setProjectError('');
+                              setProjectNotice('');
+                            }
+                            setIsEditing((current) => !current);
+                          }}
+                          className="rounded-2xl border border-[#d9e3ef] bg-white px-5 py-3 text-[14px] font-extrabold text-[#162231] shadow-sm transition hover:bg-[#f8fbff]"
+                        >
+                          {isEditing ? 'Cancel Editing' : 'Edit Project'}
+                        </button>
+                      ) : null}
+
                       <button
                         onClick={() => setShowCreateBoardModal(true)}
                         className="rounded-2xl bg-[#0f4fe6] px-5 py-3 text-[14px] font-extrabold text-white shadow-[0_16px_32px_rgba(15,79,230,0.2)] transition hover:bg-[#0b43c1]"
@@ -111,6 +242,150 @@ export function ProjectDetailPage() {
                     </div>
                   </div>
                 </div>
+
+                {projectError ? (
+                  <div className="mb-6 rounded-2xl border border-[#ffd7d7] bg-[#fff5f5] px-5 py-4 text-[14px] font-semibold text-[#b42318]">
+                    {projectError}
+                  </div>
+                ) : null}
+
+                {projectNotice ? (
+                  <div className="mb-6 rounded-2xl border border-[#d4f0dd] bg-[#edf9f1] px-5 py-4 text-[14px] font-semibold text-[#027a48]">
+                    {projectNotice}
+                  </div>
+                ) : null}
+
+                {isOwner && isEditing ? (
+                  <section className="mb-8 rounded-[34px] bg-[#eef4fa] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]">
+                    <div className="mb-8 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                      <div>
+                        <h2 className="text-[22px] font-extrabold text-[#162231]">Project Settings</h2>
+                        <p className="mt-2 text-[14px] font-medium text-[#5b6b80]">
+                          Update the project brief, priority, and timeline without leaving the detail page.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          disabled={deleteProjectMutation.isPending}
+                          onClick={() => {
+                            const confirmed = window.confirm(
+                              `Delete "${project.title}"? Linked boards will remain available as standalone boards.`
+                            );
+                            if (!confirmed) return;
+                            deleteProjectMutation.mutate();
+                          }}
+                          className="rounded-2xl bg-[#fff1f1] px-5 py-3 text-[14px] font-extrabold text-[#b42318] transition hover:bg-[#ffe5e5] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {deleteProjectMutation.isPending ? 'Deleting...' : 'Delete Project'}
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={!hasProjectChanges || !projectForm.title.trim() || updateProjectMutation.isPending}
+                          onClick={() => updateProjectMutation.mutate()}
+                          className="rounded-2xl bg-[#0f4fe6] px-5 py-3 text-[14px] font-extrabold text-white shadow-[0_16px_32px_rgba(15,79,230,0.2)] transition hover:bg-[#0b43c1] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {updateProjectMutation.isPending ? 'Saving...' : 'Save Changes'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <label className="block">
+                        <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Project Name</span>
+                        <input
+                          type="text"
+                          value={projectForm.title}
+                          onChange={(event) => {
+                            setProjectError('');
+                            setProjectNotice('');
+                            setProjectForm((current) => ({ ...current, title: event.target.value }));
+                          }}
+                          className="h-14 w-full rounded-2xl border border-[#d9e3ef] bg-white px-5 text-[15px] font-semibold text-[#162231] outline-none transition focus:border-[#b7cbe0]"
+                        />
+                      </label>
+
+                      <label className="block">
+                        <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Accent Color</span>
+                        <div className="flex h-14 items-center gap-3 rounded-2xl border border-[#d9e3ef] bg-white px-4">
+                          <input
+                            type="color"
+                            value={projectForm.color}
+                            onChange={(event) => {
+                              setProjectError('');
+                              setProjectNotice('');
+                              setProjectForm((current) => ({ ...current, color: event.target.value }));
+                            }}
+                            className="h-9 w-9 cursor-pointer rounded-xl border-0 bg-transparent p-0"
+                          />
+                          <span className="text-[14px] font-bold text-[#4e5f74]">{projectForm.color}</span>
+                        </div>
+                      </label>
+
+                      <label className="block">
+                        <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Start Date</span>
+                        <DatePickerField value={projectForm.start_date} onChange={(value) => {
+                          setProjectError('');
+                          setProjectNotice('');
+                          setProjectForm((current) => ({ ...current, start_date: value }));
+                        }} size="lg" />
+                      </label>
+
+                      <label className="block">
+                        <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Target Date</span>
+                        <DatePickerField value={projectForm.target_date} onChange={(value) => {
+                          setProjectError('');
+                          setProjectNotice('');
+                          setProjectForm((current) => ({ ...current, target_date: value }));
+                        }} size="lg" />
+                      </label>
+
+                      <label className="block">
+                        <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Status</span>
+                        <SelectField
+                          size="lg"
+                          value={projectForm.status}
+                          onChange={(value) => {
+                            setProjectError('');
+                            setProjectNotice('');
+                            setProjectForm((current) => ({ ...current, status: value }));
+                          }}
+                          options={projectStatusOptions}
+                        />
+                      </label>
+
+                      <label className="block">
+                        <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Priority</span>
+                        <SelectField
+                          size="lg"
+                          value={projectForm.priority}
+                          onChange={(value) => {
+                            setProjectError('');
+                            setProjectNotice('');
+                            setProjectForm((current) => ({ ...current, priority: value }));
+                          }}
+                          options={projectPriorityOptions}
+                        />
+                      </label>
+
+                      <label className="block md:col-span-2">
+                        <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Description</span>
+                        <textarea
+                          rows={5}
+                          value={projectForm.description}
+                          onChange={(event) => {
+                            setProjectError('');
+                            setProjectNotice('');
+                            setProjectForm((current) => ({ ...current, description: event.target.value }));
+                          }}
+                          className="w-full rounded-[28px] border border-[#d9e3ef] bg-white px-5 py-4 text-[15px] font-medium leading-7 text-[#162231] outline-none transition focus:border-[#b7cbe0]"
+                        />
+                      </label>
+                    </div>
+                  </section>
+                ) : null}
 
                 <div className="mb-8 grid gap-6 md:grid-cols-3">
                   <section className="rounded-[30px] bg-[#eef4fa] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">

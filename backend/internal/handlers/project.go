@@ -203,10 +203,22 @@ func DeleteProject(c *gin.Context) {
 		return
 	}
 
-	if err := database.DB.Delete(&project).Error; err != nil {
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.Board{}).
+			Where("project_id = ?", project.ID).
+			Update("project_id", nil).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Delete(&project).Error; err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete project"})
 		return
 	}
 
-	c.JSON(http.StatusOK, api.MessageResponse{Message: "Project deleted successfully"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "Project deleted. Linked boards remain available as standalone boards."})
 }
