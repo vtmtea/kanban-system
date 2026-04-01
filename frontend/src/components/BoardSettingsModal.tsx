@@ -4,7 +4,17 @@ import { boardApi, projectApi, swimlaneApi, webhookApi, transitionRuleApi, label
 import { AnalyticsDashboard } from '@/components/AnalyticsDashboard';
 import { SelectField } from '@/components/SelectField';
 import { useAuth } from '@/context/AuthContext';
-import type { BoardMember, Swimlane, Webhook, ListTransitionRule, Label, List, User, ListAutoAssignment } from '@/types';
+import type {
+  BoardMember,
+  Swimlane,
+  Webhook,
+  ListTransitionRule,
+  Label,
+  List,
+  User,
+  ListAutoAssignment,
+  CreateWebhookRequest,
+} from '@/types';
 
 interface BoardSettingsModalProps {
   boardId: number;
@@ -14,6 +24,8 @@ interface BoardSettingsModalProps {
 }
 
 type ManageableMemberRole = 'admin' | 'member' | 'observer';
+type WebhookEvent = CreateWebhookRequest['events'][number];
+type WebhookDraft = { url: string; events: WebhookEvent[]; isActive: boolean; secret: string };
 
 const memberRoleOptions = [
   { value: 'admin', label: 'Admin', description: 'Can manage members, settings, and board structure.' },
@@ -21,7 +33,24 @@ const memberRoleOptions = [
   { value: 'observer', label: 'Observer', description: 'Can view board progress without making changes.' },
 ];
 
-const webhookEventOptions = ['card.created', 'card.updated', 'card.moved', 'card.completed'] as const;
+const webhookEventOptions: readonly WebhookEvent[] = [
+  'card.created',
+  'card.updated',
+  'card.moved',
+  'card.deleted',
+  'card.completed',
+  'card.assigned',
+  'comment.created',
+  'checklist.completed',
+];
+
+function normalizeEventSelection(events: readonly string[]) {
+  return [...events].sort().join('|');
+}
+
+function toWebhookEvents(events: readonly string[]): WebhookEvent[] {
+  return webhookEventOptions.filter((event) => events.includes(event));
+}
 
 function getUserDisplayName(user?: User | null) {
   return user?.nickname || user?.username || 'Unknown user';
@@ -61,6 +90,7 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
   const [listDrafts, setListDrafts] = useState<Record<number, { title: string; wipLimit: string }>>({});
   const [swimlaneDrafts, setSwimlaneDrafts] = useState<Record<number, { name: string; color: string }>>({});
   const [labelDrafts, setLabelDrafts] = useState<Record<number, { name: string; color: string }>>({});
+  const [webhookDrafts, setWebhookDrafts] = useState<Record<number, WebhookDraft>>({});
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -288,7 +318,7 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
   });
 
   const createWebhookMutation = useMutation({
-    mutationFn: (data: { url: string; events: any[] }) => webhookApi.create(boardId, data),
+    mutationFn: (data: { url: string; events: WebhookEvent[]; secret?: string }) => webhookApi.create(boardId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['board', boardId, 'webhooks'] });
       setAutomationError('');
@@ -297,6 +327,45 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
     onError: (error: any) => {
       setAutomationNotice('');
       setAutomationError(error.response?.data?.error || 'Failed to add webhook');
+    },
+  });
+
+  const updateWebhookMutation = useMutation({
+    mutationFn: (data: { id: number; url: string; events: WebhookEvent[]; isActive: boolean; secret: string }) => {
+      const payload: {
+        url: string;
+        events: string[];
+        is_active: boolean;
+        secret?: string;
+      } = {
+        url: data.url.trim(),
+        events: data.events,
+        is_active: data.isActive,
+      };
+
+      if (data.secret.trim()) {
+        payload.secret = data.secret.trim();
+      }
+
+      return webhookApi.update(data.id, payload);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['board', boardId, 'webhooks'] });
+      setAutomationError('');
+      setAutomationNotice('Webhook updated.');
+      setWebhookDrafts((current) => ({
+        ...current,
+        [variables.id]: {
+          url: variables.url.trim(),
+          events: variables.events,
+          isActive: variables.isActive,
+          secret: '',
+        },
+      }));
+    },
+    onError: (error: any) => {
+      setAutomationNotice('');
+      setAutomationError(error.response?.data?.error || 'Failed to update webhook');
     },
   });
 
@@ -572,6 +641,22 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
   }, [labels?.data]);
 
   useEffect(() => {
+    setWebhookDrafts(
+      Object.fromEntries(
+        (webhooks?.data || []).map((webhook) => [
+          webhook.id,
+          {
+            url: webhook.url || '',
+            events: toWebhookEvents(webhook.events || []),
+            isActive: webhook.is_active,
+            secret: '',
+          },
+        ])
+      )
+    );
+  }, [webhooks?.data]);
+
+  useEffect(() => {
     setShowInvitePanel(false);
     setInviteQuery('');
     setInviteRole('member');
@@ -589,6 +674,7 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
     setListDrafts({});
     setSwimlaneDrafts({});
     setLabelDrafts({});
+    setWebhookDrafts({});
   }, [boardId]);
 
   const scrollToSection = (id: string) => {
@@ -1601,19 +1687,21 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
                            <h4 className="text-[11px] font-extrabold text-gray-400 uppercase tracking-widest mb-4">Webhooks</h4>
 
                            <div className="bg-[#f8fafc] p-5 rounded-2xl border border-gray-100 space-y-4 mb-6">
-                              <input type="url" id="webhook-url" placeholder="https://api.kineticcore.io/webhook" className="w-full bg-white px-4 py-3 border border-gray-200 rounded-xl font-medium text-sm focus:border-[#0d6efd] focus:ring-1 focus:ring-[#0d6efd] outline-none transition-all placeholder-gray-400" />
+                              <input type="url" id="webhook-url" placeholder="https://api.kineticcore.io/webhook" disabled={!canManageMembers || createWebhookMutation.isPending} className="w-full bg-white px-4 py-3 border border-gray-200 rounded-xl font-medium text-sm focus:border-[#0d6efd] focus:ring-1 focus:ring-[#0d6efd] outline-none transition-all placeholder-gray-400 disabled:cursor-not-allowed disabled:opacity-60" />
+                              <input type="text" id="webhook-secret" placeholder="Optional signing secret" disabled={!canManageMembers || createWebhookMutation.isPending} className="w-full bg-white px-4 py-3 border border-gray-200 rounded-xl font-medium text-sm focus:border-[#0d6efd] focus:ring-1 focus:ring-[#0d6efd] outline-none transition-all placeholder-gray-400 disabled:cursor-not-allowed disabled:opacity-60" />
                               <div className="flex flex-wrap gap-2 text-[12px] font-bold text-gray-600">
                                  {webhookEventOptions.map((event) => (
                                     <label key={event} className="flex items-center gap-2 bg-white px-3 py-1.5 border border-gray-200 rounded-lg cursor-pointer hover:border-[#0d6efd] transition-colors">
-                                       <input type="checkbox" value={event} className="webhook-event rounded border-gray-300 text-[#0d6efd] focus:ring-[#0d6efd]" />
+                                       <input type="checkbox" value={event} disabled={!canManageMembers || createWebhookMutation.isPending} className="webhook-event rounded border-gray-300 text-[#0d6efd] focus:ring-[#0d6efd] disabled:cursor-not-allowed" />
                                        {event}
                                     </label>
                                  ))}
                               </div>
-                              <button onClick={() => {
+                              <button disabled={!canManageMembers || createWebhookMutation.isPending} onClick={() => {
                                  const urlInput = document.getElementById('webhook-url') as HTMLInputElement;
+                                 const secretInput = document.getElementById('webhook-secret') as HTMLInputElement;
                                  const checkboxes = document.querySelectorAll('.webhook-event:checked') as NodeListOf<HTMLInputElement>;
-                                 const events = Array.from(checkboxes).map(cb => cb.value);
+                                 const events = toWebhookEvents(Array.from(checkboxes).map((cb) => cb.value));
                                  if (!urlInput?.value.trim()) {
                                     setAutomationNotice('');
                                     setAutomationError('Webhook URL is required.');
@@ -1625,41 +1713,177 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
                                     return;
                                  }
 
-                                 createWebhookMutation.mutate({ url: urlInput.value.trim(), events });
+                                 createWebhookMutation.mutate({
+                                   url: urlInput.value.trim(),
+                                   events,
+                                   secret: secretInput?.value.trim() || undefined,
+                                 });
                                  urlInput.value = '';
+                                 if (secretInput) {
+                                   secretInput.value = '';
+                                 }
                                  checkboxes.forEach((cb) => (cb.checked = false));
-                              }} className="px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold shadow-sm hover:bg-black transition-colors w-full sm:w-auto">
+                              }} className="px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold shadow-sm hover:bg-black transition-colors w-full sm:w-auto disabled:cursor-not-allowed disabled:opacity-60">
                                  {createWebhookMutation.isPending ? 'Adding...' : 'Add Webhook'}
                               </button>
                            </div>
 
                            <div className="space-y-3">
-                              {webhooks?.data?.map((webhook: Webhook) => (
-                                 <div key={webhook.id} className="flex flex-col gap-3 p-4 bg-white border border-gray-100 rounded-xl group hover:shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                                    <div className="min-w-0">
-                                       <div className="font-bold text-gray-800 text-[14px] truncate">{webhook.url}</div>
-                                       <div className="text-[11px] text-gray-400 font-extrabold mt-1 tracking-wide">{webhook.events.join(', ')}</div>
-                                    </div>
-                                    <div className="flex items-center gap-2 opacity-100 transition-all sm:opacity-0 sm:group-hover:opacity-100">
+                              {webhooks?.data?.map((webhook: Webhook) => {
+                                 const draft = webhookDrafts[webhook.id] || {
+                                   url: webhook.url || '',
+                                   events: toWebhookEvents(webhook.events || []),
+                                   isActive: webhook.is_active,
+                                   secret: '',
+                                 };
+                                 const hasChanges =
+                                   draft.url.trim() !== webhook.url ||
+                                   draft.isActive !== webhook.is_active ||
+                                   normalizeEventSelection(draft.events) !== normalizeEventSelection(webhook.events) ||
+                                   draft.secret.trim() !== '';
+                                 const isSaving =
+                                   updateWebhookMutation.isPending &&
+                                   updateWebhookMutation.variables?.id === webhook.id;
+                                 const isDeleting =
+                                   deleteWebhookMutation.isPending &&
+                                   deleteWebhookMutation.variables === webhook.id;
+                                 const isTesting =
+                                   testWebhookMutation.isPending &&
+                                   testWebhookMutation.variables === webhook.id;
+
+                                 return (
+                                   <div key={webhook.id} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                                     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_160px]">
+                                       <label className="block lg:col-span-2">
+                                         <span className="mb-3 block text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Webhook URL</span>
+                                         <input
+                                           type="url"
+                                           value={draft.url}
+                                           disabled={!canManageMembers || isSaving || isDeleting || isTesting}
+                                           onChange={(event) =>
+                                             setWebhookDrafts((current) => ({
+                                               ...current,
+                                               [webhook.id]: {
+                                                 ...draft,
+                                                 url: event.target.value,
+                                               },
+                                             }))
+                                           }
+                                           className="h-12 w-full rounded-2xl border border-[#d9e3ef] bg-white px-4 text-[14px] font-semibold text-[#162231] outline-none transition focus:border-[#b7cbe0] disabled:cursor-not-allowed disabled:opacity-60"
+                                         />
+                                       </label>
+
+                                       <label className="block lg:col-span-2">
+                                         <span className="mb-3 block text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Events</span>
+                                         <div className="flex flex-wrap gap-2 text-[12px] font-bold text-gray-600">
+                                            {webhookEventOptions.map((event) => (
+                                               <label key={`${webhook.id}-${event}`} className="flex items-center gap-2 bg-[#f8fafc] px-3 py-1.5 border border-gray-200 rounded-lg cursor-pointer hover:border-[#0d6efd] transition-colors">
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={draft.events.includes(event)}
+                                                    disabled={!canManageMembers || isSaving || isDeleting || isTesting}
+                                                    onChange={(changeEvent) =>
+                                                      setWebhookDrafts((current) => ({
+                                                        ...current,
+                                                        [webhook.id]: {
+                                                          ...draft,
+                                                          events: changeEvent.target.checked
+                                                            ? [...draft.events, event]
+                                                            : draft.events.filter((selectedEvent) => selectedEvent !== event),
+                                                        },
+                                                      }))
+                                                    }
+                                                    className="rounded border-gray-300 text-[#0d6efd] focus:ring-[#0d6efd]"
+                                                  />
+                                                  {event}
+                                               </label>
+                                            ))}
+                                         </div>
+                                       </label>
+
+                                       <label className="block">
+                                         <span className="mb-3 block text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Rotate Secret</span>
+                                         <input
+                                           type="text"
+                                           value={draft.secret}
+                                           placeholder="Leave blank to keep current secret"
+                                           disabled={!canManageMembers || isSaving || isDeleting || isTesting}
+                                           onChange={(event) =>
+                                             setWebhookDrafts((current) => ({
+                                               ...current,
+                                               [webhook.id]: {
+                                                 ...draft,
+                                                 secret: event.target.value,
+                                               },
+                                             }))
+                                           }
+                                           className="h-12 w-full rounded-2xl border border-[#d9e3ef] bg-white px-4 text-[14px] font-semibold text-[#162231] outline-none transition focus:border-[#b7cbe0] disabled:cursor-not-allowed disabled:opacity-60"
+                                         />
+                                       </label>
+
+                                       <div className="flex items-center justify-between rounded-2xl border border-[#d9e3ef] bg-white px-4 py-3">
+                                         <div>
+                                           <div className="text-[13px] font-bold text-[#162231]">{draft.isActive ? 'Active' : 'Paused'}</div>
+                                           <div className="mt-1 text-[11px] font-medium text-[#6b7b90]">
+                                             {draft.isActive ? 'Deliver matching events automatically.' : 'Keep configuration without sending events.'}
+                                           </div>
+                                         </div>
+                                         <button
+                                           type="button"
+                                           disabled={!canManageMembers || isSaving || isDeleting || isTesting}
+                                           onClick={() =>
+                                             setWebhookDrafts((current) => ({
+                                               ...current,
+                                               [webhook.id]: {
+                                                 ...draft,
+                                                 isActive: !draft.isActive,
+                                               },
+                                             }))
+                                           }
+                                           className={`relative h-8 w-14 rounded-full transition ${draft.isActive ? 'bg-[#0f4fe6]' : 'bg-[#d7e1ec]'}`}
+                                         >
+                                           <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition ${draft.isActive ? 'left-7' : 'left-1'}`} />
+                                         </button>
+                                       </div>
+                                     </div>
+
+                                     <div className="mt-4 flex flex-wrap items-center gap-3">
                                        <button
                                          type="button"
-                                         disabled={testWebhookMutation.isPending}
+                                         disabled={!canManageMembers || !draft.url.trim() || draft.events.length === 0 || !hasChanges || isSaving || isDeleting || isTesting}
+                                         onClick={() =>
+                                           updateWebhookMutation.mutate({
+                                             id: webhook.id,
+                                             url: draft.url,
+                                             events: draft.events,
+                                             isActive: draft.isActive,
+                                             secret: draft.secret,
+                                           })
+                                         }
+                                         className="px-4 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-bold hover:bg-black transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                                       >
+                                         {isSaving ? 'Saving...' : 'Save'}
+                                       </button>
+                                       <button
+                                         type="button"
+                                         disabled={!canManageMembers || testWebhookMutation.isPending}
                                          onClick={() => testWebhookMutation.mutate(webhook.id)}
-                                         className="px-3 py-1.5 rounded-lg bg-[#eef4ff] text-[#0d6efd] font-extrabold text-[11px] uppercase tracking-widest hover:bg-[#dce8ff] transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                                         className="px-4 py-2.5 rounded-xl bg-[#eef4ff] text-[#0d6efd] text-sm font-bold hover:bg-[#dce8ff] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                                        >
-                                         {testWebhookMutation.isPending && testWebhookMutation.variables === webhook.id ? 'Testing...' : 'Test'}
+                                         {isTesting ? 'Testing...' : 'Test'}
                                        </button>
                                        <button
                                          type="button"
-                                         disabled={deleteWebhookMutation.isPending}
+                                         disabled={!canManageMembers || deleteWebhookMutation.isPending}
                                          onClick={() => deleteWebhookMutation.mutate(webhook.id)}
-                                         className="text-red-500 font-extrabold text-[11px] uppercase tracking-widest bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                                         className="px-4 py-2.5 rounded-xl bg-red-50 text-red-600 text-sm font-bold hover:bg-red-100 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                                        >
-                                         Remove
+                                         {isDeleting ? 'Deleting...' : 'Remove'}
                                        </button>
-                                    </div>
-                                 </div>
-                              ))}
+                                     </div>
+                                   </div>
+                                 );
+                              })}
                            </div>
                         </div>
 
