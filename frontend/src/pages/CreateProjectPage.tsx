@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Sidebar } from '@/components/Sidebar';
@@ -32,29 +32,14 @@ const templates = [
   },
 ];
 
-const collaborators = [
-  { name: 'Sarah Chen', role: 'Design Lead', avatar: 'https://i.pravatar.cc/120?img=32' },
-  { name: 'Marcus Thorne', role: 'Engineering', avatar: 'https://i.pravatar.cc/120?img=15' },
-  { name: 'Elena Rodriguez', role: 'Product Owner', avatar: 'https://i.pravatar.cc/120?img=48' },
-];
-
-const deliveryChecklist = [
-  'Create project scope and goals',
-  'Add boards under this project',
-  'Invite core team members',
-  'Define target delivery timeline',
-];
-
 export function CreateProjectPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const [title, setTitle] = useState('Aurora Commerce Revamp');
-  const [description, setDescription] = useState(
-    'Cross-functional redesign of the commerce experience covering UX, engineering delivery, analytics instrumentation, and launch readiness.'
-  );
-  const [startDate, setStartDate] = useState('2026-04-03');
-  const [targetDate, setTargetDate] = useState('2026-06-30');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [targetDate, setTargetDate] = useState('');
   const [status, setStatus] = useState('planning');
   const [priority, setPriority] = useState('high');
   const [templateId, setTemplateId] = useState('launch');
@@ -63,6 +48,20 @@ export function CreateProjectPage() {
   const selectedTemplate = templates.find((template) => template.id === templateId) || templates[0];
   const ownerName = user?.nickname || user?.username || 'Current User';
   const ownerEmail = user?.email || 'workspace@kinetic.io';
+  const ownerAvatar = user?.avatar || `https://i.pravatar.cc/160?u=${user?.id || 'owner'}`;
+  const setupChecklist = useMemo(
+    () => [
+      { label: 'Add a project name', completed: !!title.trim() },
+      { label: 'Write a short description', completed: !!description.trim() },
+      { label: 'Set a target delivery window', completed: !!startDate && !!targetDate },
+      { label: 'Choose the operating status and priority', completed: !!status && !!priority },
+      { label: 'Pick the visual template', completed: !!templateId },
+    ],
+    [description, priority, startDate, status, targetDate, templateId, title]
+  );
+  const completedChecklistCount = setupChecklist.filter((item) => item.completed).length;
+  const statusLabel = status.replace('-', ' ');
+  const priorityLabel = priority;
 
   const createProjectMutation = useMutation({
     mutationFn: () =>
@@ -244,17 +243,27 @@ export function CreateProjectPage() {
                   </div>
 
                   <div className="mb-8 grid gap-4 md:grid-cols-3">
-                    {collaborators.map((member) => (
-                      <div key={member.name} className="rounded-[26px] bg-white p-5 shadow-sm">
-                        <div className="flex items-center gap-4">
-                          <img src={member.avatar} alt={member.name} className="h-14 w-14 rounded-2xl object-cover" />
-                          <div>
-                            <h3 className="text-[17px] font-extrabold text-[#162231]">{member.name}</h3>
-                            <p className="mt-1 text-[13px] font-medium text-[#5b6b80]">{member.role}</p>
-                          </div>
+                    <div className="rounded-[26px] bg-white p-5 shadow-sm">
+                      <div className="flex items-center gap-4">
+                        <img src={ownerAvatar} alt={ownerName} className="h-14 w-14 rounded-2xl object-cover" />
+                        <div>
+                          <h3 className="text-[17px] font-extrabold text-[#162231]">{ownerName}</h3>
+                          <p className="mt-1 text-[13px] font-medium text-[#5b6b80]">Project owner</p>
                         </div>
                       </div>
-                    ))}
+                    </div>
+
+                    <div className="rounded-[26px] bg-white p-5 shadow-sm">
+                      <div className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-[#4e5f74]">Status</div>
+                      <div className="mt-4 text-[22px] font-extrabold capitalize tracking-tight text-[#162231]">{statusLabel}</div>
+                      <div className="mt-2 text-[13px] font-medium text-[#5b6b80]">Sets how this project appears across overview pages.</div>
+                    </div>
+
+                    <div className="rounded-[26px] bg-white p-5 shadow-sm">
+                      <div className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-[#4e5f74]">Priority</div>
+                      <div className="mt-4 text-[22px] font-extrabold capitalize tracking-tight text-[#162231]">{priorityLabel}</div>
+                      <div className="mt-2 text-[13px] font-medium text-[#5b6b80]">Helps the portfolio view sort urgency once the project ships.</div>
+                    </div>
                   </div>
 
                   <div className="grid gap-6 md:grid-cols-2">
@@ -310,24 +319,45 @@ export function CreateProjectPage() {
                         {startDate || 'Not set'} to {targetDate || 'Not set'}
                       </p>
                     </div>
+
+                    <div className="rounded-[24px] bg-[#eef8f2] p-5">
+                      <p className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-[#027a48]">Readiness</p>
+                      <p className="mt-3 text-[28px] font-extrabold tracking-tight text-[#162231]">
+                        {completedChecklistCount}/{setupChecklist.length}
+                      </p>
+                      <p className="mt-2 text-[13px] font-medium leading-6 text-[#4b6353]">
+                        Core fields completed before creating the project.
+                      </p>
+                    </div>
                   </div>
                 </section>
 
                 <section className="rounded-[34px] bg-[#eef4fa] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]">
                   <div className="mb-6 flex items-center justify-between">
                     <h2 className="text-[20px] font-extrabold text-[#162231]">Launch Checklist</h2>
-                    <span className="rounded-full bg-white px-3 py-1 text-[12px] font-extrabold text-[#4e5f74]">4 ITEMS</span>
+                    <span className="rounded-full bg-white px-3 py-1 text-[12px] font-extrabold text-[#4e5f74]">
+                      {completedChecklistCount}/{setupChecklist.length} READY
+                    </span>
                   </div>
 
                   <div className="space-y-4">
-                    {deliveryChecklist.map((item) => (
-                      <div key={item} className="flex items-start gap-4 rounded-[24px] bg-white px-5 py-4 shadow-sm">
-                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#dfe7ff] text-[#0f4fe6]">
-                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.8} d="M5 13l4 4L19 7" />
-                          </svg>
+                    {setupChecklist.map((item) => (
+                      <div key={item.label} className="flex items-start gap-4 rounded-[24px] bg-white px-5 py-4 shadow-sm">
+                        <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${item.completed ? 'bg-[#dfe7ff] text-[#0f4fe6]' : 'bg-[#eef4fa] text-[#7b8da6]'}`}>
+                          {item.completed ? (
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.8} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <span className="h-2.5 w-2.5 rounded-full bg-current" />
+                          )}
                         </span>
-                        <p className="text-[14px] font-semibold leading-6 text-[#223042]">{item}</p>
+                        <div>
+                          <p className="text-[14px] font-semibold leading-6 text-[#223042]">{item.label}</p>
+                          <p className="mt-1 text-[12px] font-medium text-[#6b7b90]">
+                            {item.completed ? 'Ready' : 'Still missing'}
+                          </p>
+                        </div>
                       </div>
                     ))}
                   </div>
