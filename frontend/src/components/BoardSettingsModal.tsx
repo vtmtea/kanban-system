@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { boardApi, projectApi, swimlaneApi, webhookApi, transitionRuleApi, labelApi, userApi } from '@/services/api';
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
+import { boardApi, projectApi, swimlaneApi, webhookApi, transitionRuleApi, labelApi, userApi, listApi } from '@/services/api';
 import { AnalyticsDashboard } from '@/components/AnalyticsDashboard';
 import { SelectField } from '@/components/SelectField';
 import { useAuth } from '@/context/AuthContext';
-import type { BoardMember, Swimlane, Webhook, ListTransitionRule, Label, List, User } from '@/types';
+import type { BoardMember, Swimlane, Webhook, ListTransitionRule, Label, List, User, ListAutoAssignment } from '@/types';
 
 interface BoardSettingsModalProps {
   boardId: number;
@@ -50,6 +50,7 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted }: BoardSetting
   const [memberNotice, setMemberNotice] = useState('');
   const [automationError, setAutomationError] = useState('');
   const [automationNotice, setAutomationNotice] = useState('');
+  const [autoAssignmentDrafts, setAutoAssignmentDrafts] = useState<Record<number, string>>({});
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -68,8 +69,22 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted }: BoardSetting
         q: inviteQuery.trim() || undefined,
         limit: 8,
         exclude_board_id: boardId,
-      }),
+    }),
     enabled: showInvitePanel,
+  });
+  const boardData = board?.data;
+  const lists = boardData?.lists || [];
+  const memberList = members?.data || [];
+  const currentBoardMember = memberList.find((member) => member.user_id === user?.id);
+  const isBoardOwner = !!user && boardData?.owner_id === user.id;
+  const canManageMembers = isBoardOwner || ['owner', 'admin'].includes(currentBoardMember?.role || '');
+
+  const autoAssignmentQueries = useQueries({
+    queries: lists.map((list) => ({
+      queryKey: ['list', list.id, 'auto-assignments'],
+      queryFn: () => listApi.getAutoAssignments(list.id),
+      enabled: !!list.id,
+    })),
   });
 
   // Mutations
@@ -168,6 +183,43 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted }: BoardSetting
     },
   });
 
+  const setAutoAssignmentMutation = useMutation({
+    mutationFn: (data: { listId: number; userId: number }) =>
+      listApi.setAutoAssignment(data.listId, { user_id: data.userId }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['list', variables.listId, 'auto-assignments'] });
+      setAutomationError('');
+      setAutomationNotice('Auto-assignment rule saved.');
+      setAutoAssignmentDrafts((current) => {
+        const next = { ...current };
+        delete next[variables.listId];
+        return next;
+      });
+    },
+    onError: (error: any) => {
+      setAutomationNotice('');
+      setAutomationError(error.response?.data?.error || 'Failed to save auto-assignment rule');
+    },
+  });
+
+  const deleteAutoAssignmentMutation = useMutation({
+    mutationFn: (listId: number) => listApi.deleteAutoAssignment(listId),
+    onSuccess: (_, listId) => {
+      queryClient.invalidateQueries({ queryKey: ['list', listId, 'auto-assignments'] });
+      setAutomationError('');
+      setAutomationNotice('Auto-assignment rule removed.');
+      setAutoAssignmentDrafts((current) => {
+        const next = { ...current };
+        delete next[listId];
+        return next;
+      });
+    },
+    onError: (error: any) => {
+      setAutomationNotice('');
+      setAutomationError(error.response?.data?.error || 'Failed to remove auto-assignment rule');
+    },
+  });
+
   const testWebhookMutation = useMutation({
     mutationFn: (id: number) => webhookApi.test(id),
     onSuccess: (response) => {
@@ -263,13 +315,6 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted }: BoardSetting
     },
   });
 
-  const boardData = board?.data;
-  const lists = boardData?.lists || [];
-  const isBoardOwner = !!user && boardData?.owner_id === user.id;
-  const memberList = members?.data || [];
-  const currentBoardMember = memberList.find((member) => member.user_id === user?.id);
-  const canManageMembers = isBoardOwner || ['owner', 'admin'].includes(currentBoardMember?.role || '');
-
   const projectOptions = useMemo(
     () => [
       { value: 'none', label: 'Standalone Board', description: 'Keep this board outside of any project.' },
@@ -286,6 +331,31 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted }: BoardSetting
     const existingMemberIds = new Set(memberList.map((member) => member.user_id));
     return (inviteCandidatesData?.data || []).filter((candidate) => !existingMemberIds.has(candidate.id));
   }, [inviteCandidatesData?.data, memberList]);
+
+  const autoAssignmentOptions = useMemo(
+    () => [
+      {
+        value: '',
+        label: 'No Auto Assignee',
+        description: 'Cards keep their current assignee when they enter this status.',
+      },
+      ...memberList.map((member) => ({
+        value: String(member.user_id),
+        label: getUserDisplayName(member.user),
+        description: `Role: ${member.role}`,
+      })),
+    ],
+    [memberList]
+  );
+
+  const autoAssignmentsByListId = useMemo(() => {
+    const entries = lists.map((list, index) => {
+      const assignment = autoAssignmentQueries[index]?.data?.data?.[0] || null;
+      return [list.id, assignment] as const;
+    });
+
+    return Object.fromEntries(entries) as Record<number, ListAutoAssignment | null>;
+  }, [lists, autoAssignmentQueries]);
 
   useEffect(() => {
     if (!boardData) return;
@@ -309,6 +379,7 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted }: BoardSetting
     setMemberNotice('');
     setAutomationError('');
     setAutomationNotice('');
+    setAutoAssignmentDrafts({});
   }, [boardId]);
 
   const scrollToSection = (id: string) => {
@@ -887,21 +958,108 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted }: BoardSetting
                            <h3 className="text-xl font-extrabold text-gray-900 mb-1.5 tracking-tight">Automations</h3>
                            <p className="text-[13px] text-gray-500 font-medium">Configure webhooks and list transition rules to automate logic.</p>
                         </div>
+
+                        {automationError ? (
+                           <div className="mb-5 rounded-xl border border-[#ffd7d7] bg-[#fff5f5] px-4 py-3 text-sm font-semibold text-[#b42318]">
+                              {automationError}
+                           </div>
+                        ) : null}
+
+                        {automationNotice ? (
+                           <div className="mb-5 rounded-xl border border-[#d4f0dd] bg-[#edf9f1] px-4 py-3 text-sm font-semibold text-[#027a48]">
+                              {automationNotice}
+                           </div>
+                        ) : null}
                         
                         <div className="mb-10">
+                           <h4 className="text-[11px] font-extrabold text-gray-400 uppercase tracking-widest mb-4">Auto Assignments</h4>
+
+                           {!canManageMembers ? (
+                              <div className="mb-5 rounded-xl border border-gray-100 bg-[#f8fafc] px-4 py-3 text-sm font-medium text-gray-500">
+                                 Only board owners and admins can change auto-assignment rules. Current rules are shown here for visibility.
+                              </div>
+                           ) : null}
+
+                           {lists.length === 0 ? (
+                              <div className="mb-8 rounded-2xl border border-dashed border-gray-200 bg-[#f8fafc] px-5 py-4 text-sm font-medium text-gray-500">
+                                 Create a few statuses first, then you can assign a default owner for cards entering each list.
+                              </div>
+                           ) : (
+                              <div className="mb-10 space-y-3">
+                                 {lists.map((list: List, index) => {
+                                    const currentAssignment = autoAssignmentsByListId[list.id];
+                                    const currentValue = currentAssignment?.user_id ? String(currentAssignment.user_id) : '';
+                                    const selectedValue = autoAssignmentDrafts[list.id] ?? currentValue;
+                                    const hasPendingChange = autoAssignmentDrafts[list.id] !== undefined && autoAssignmentDrafts[list.id] !== currentValue;
+                                    const isFetchingAutoAssignment = autoAssignmentQueries[index]?.isLoading;
+                                    const isSavingRule =
+                                      setAutoAssignmentMutation.isPending &&
+                                      setAutoAssignmentMutation.variables?.listId === list.id;
+                                    const isDeletingRule =
+                                      deleteAutoAssignmentMutation.isPending &&
+                                      deleteAutoAssignmentMutation.variables === list.id;
+
+                                    return (
+                                       <div key={list.id} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                                          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                             <div className="min-w-0 lg:max-w-[260px]">
+                                                <div className="text-[14px] font-extrabold text-gray-900">{list.title}</div>
+                                                <div className="mt-1 text-[12px] font-medium text-gray-500">
+                                                   {isFetchingAutoAssignment
+                                                     ? 'Loading current rule...'
+                                                     : currentAssignment?.user
+                                                       ? `Cards entering this status will be assigned to ${getUserDisplayName(currentAssignment.user)}.`
+                                                       : 'No automatic assignee configured for this status yet.'}
+                                                </div>
+                                             </div>
+
+                                             <div className="flex flex-col gap-3 lg:w-[520px] lg:flex-row lg:items-center">
+                                                <SelectField
+                                                  size="md"
+                                                  value={selectedValue}
+                                                  disabled={!canManageMembers || isFetchingAutoAssignment || isSavingRule || isDeletingRule}
+                                                  onChange={(value) =>
+                                                    setAutoAssignmentDrafts((current) => ({
+                                                      ...current,
+                                                      [list.id]: value,
+                                                    }))
+                                                  }
+                                                  options={autoAssignmentOptions}
+                                                  placeholder="Choose default assignee..."
+                                                />
+                                                <button
+                                                  type="button"
+                                                  disabled={!canManageMembers || !hasPendingChange || isSavingRule || isDeletingRule}
+                                                  onClick={() => {
+                                                    if (!selectedValue) {
+                                                      deleteAutoAssignmentMutation.mutate(list.id);
+                                                      return;
+                                                    }
+
+                                                    setAutoAssignmentMutation.mutate({
+                                                      listId: list.id,
+                                                      userId: Number(selectedValue),
+                                                    });
+                                                  }}
+                                                  className="px-4 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-bold hover:bg-black transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                                                >
+                                                  {isSavingRule || isDeletingRule
+                                                    ? 'Saving...'
+                                                    : selectedValue
+                                                      ? 'Save Rule'
+                                                      : 'Clear Rule'}
+                                                </button>
+                                             </div>
+                                          </div>
+                                       </div>
+                                    );
+                                 })}
+                              </div>
+                           )}
+                        </div>
+
+                        <div className="mb-10">
                            <h4 className="text-[11px] font-extrabold text-gray-400 uppercase tracking-widest mb-4">Webhooks</h4>
-
-                           {automationError ? (
-                              <div className="mb-5 rounded-xl border border-[#ffd7d7] bg-[#fff5f5] px-4 py-3 text-sm font-semibold text-[#b42318]">
-                                 {automationError}
-                              </div>
-                           ) : null}
-
-                           {automationNotice ? (
-                              <div className="mb-5 rounded-xl border border-[#d4f0dd] bg-[#edf9f1] px-4 py-3 text-sm font-semibold text-[#027a48]">
-                                 {automationNotice}
-                              </div>
-                           ) : null}
 
                            <div className="bg-[#f8fafc] p-5 rounded-2xl border border-gray-100 space-y-4 mb-6">
                               <input type="url" id="webhook-url" placeholder="https://api.kineticcore.io/webhook" className="w-full bg-white px-4 py-3 border border-gray-200 rounded-xl font-medium text-sm focus:border-[#0d6efd] focus:ring-1 focus:ring-[#0d6efd] outline-none transition-all placeholder-gray-400" />
