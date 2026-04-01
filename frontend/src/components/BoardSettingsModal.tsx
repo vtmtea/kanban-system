@@ -49,12 +49,18 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
   const [generalNotice, setGeneralNotice] = useState('');
   const [memberError, setMemberError] = useState('');
   const [memberNotice, setMemberNotice] = useState('');
+  const [swimlaneError, setSwimlaneError] = useState('');
+  const [swimlaneNotice, setSwimlaneNotice] = useState('');
   const [listError, setListError] = useState('');
   const [listNotice, setListNotice] = useState('');
+  const [labelError, setLabelError] = useState('');
+  const [labelNotice, setLabelNotice] = useState('');
   const [automationError, setAutomationError] = useState('');
   const [automationNotice, setAutomationNotice] = useState('');
   const [autoAssignmentDrafts, setAutoAssignmentDrafts] = useState<Record<number, string>>({});
   const [listDrafts, setListDrafts] = useState<Record<number, { title: string; wipLimit: string }>>({});
+  const [swimlaneDrafts, setSwimlaneDrafts] = useState<Record<number, { name: string; color: string }>>({});
+  const [labelDrafts, setLabelDrafts] = useState<Record<number, { name: string; color: string }>>({});
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -140,6 +146,37 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['board', boardId, 'swimlanes'] });
       queryClient.invalidateQueries({ queryKey: ['board', boardId] });
+      setSwimlaneError('');
+      setSwimlaneNotice('Swimlane created.');
+    },
+    onError: (error: any) => {
+      setSwimlaneNotice('');
+      setSwimlaneError(error.response?.data?.error || 'Failed to create swimlane');
+    },
+  });
+
+  const updateSwimlaneMutation = useMutation({
+    mutationFn: (data: { id: number; name: string; color: string }) =>
+      swimlaneApi.update(data.id, {
+        name: data.name.trim(),
+        color: data.color,
+      }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['board', boardId, 'swimlanes'] });
+      queryClient.invalidateQueries({ queryKey: ['board', boardId] });
+      setSwimlaneError('');
+      setSwimlaneNotice('Swimlane updated.');
+      setSwimlaneDrafts((current) => ({
+        ...current,
+        [variables.id]: {
+          name: variables.name.trim(),
+          color: variables.color,
+        },
+      }));
+    },
+    onError: (error: any) => {
+      setSwimlaneNotice('');
+      setSwimlaneError(error.response?.data?.error || 'Failed to update swimlane');
     },
   });
 
@@ -148,6 +185,12 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['board', boardId, 'swimlanes'] });
       queryClient.invalidateQueries({ queryKey: ['board', boardId] });
+      setSwimlaneError('');
+      setSwimlaneNotice('Swimlane removed.');
+    },
+    onError: (error: any) => {
+      setSwimlaneNotice('');
+      setSwimlaneError(error.response?.data?.error || 'Failed to delete swimlane');
     },
   });
 
@@ -196,12 +239,52 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
 
   const createLabelMutation = useMutation({
     mutationFn: (data: { name: string; color: string }) => labelApi.create(boardId, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['labels', boardId] }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['labels', boardId] });
+      setLabelError('');
+      setLabelNotice('Label created.');
+    },
+    onError: (error: any) => {
+      setLabelNotice('');
+      setLabelError(error.response?.data?.error || 'Failed to create label');
+    },
+  });
+
+  const updateLabelMutation = useMutation({
+    mutationFn: (data: { id: number; name: string; color: string }) =>
+      labelApi.update(data.id, {
+        name: data.name.trim(),
+        color: data.color,
+      }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['labels', boardId] });
+      setLabelError('');
+      setLabelNotice('Label updated.');
+      setLabelDrafts((current) => ({
+        ...current,
+        [variables.id]: {
+          name: variables.name.trim(),
+          color: variables.color,
+        },
+      }));
+    },
+    onError: (error: any) => {
+      setLabelNotice('');
+      setLabelError(error.response?.data?.error || 'Failed to update label');
+    },
   });
 
   const deleteLabelMutation = useMutation({
     mutationFn: (id: number) => labelApi.delete(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['labels', boardId] }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['labels', boardId] });
+      setLabelError('');
+      setLabelNotice('Label removed.');
+    },
+    onError: (error: any) => {
+      setLabelNotice('');
+      setLabelError(error.response?.data?.error || 'Failed to delete label');
+    },
   });
 
   const createWebhookMutation = useMutation({
@@ -457,17 +540,55 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
   }, [boardData]);
 
   useEffect(() => {
+    setSwimlaneDrafts(
+      Object.fromEntries(
+        (swimlanes?.data || []).map((swimlane) => [
+          swimlane.id,
+          {
+            name: swimlane.name || '',
+            color: swimlane.color || '#0d6efd',
+          },
+        ])
+      )
+    );
+    setSwimlaneError('');
+    setSwimlaneNotice('');
+  }, [swimlanes?.data]);
+
+  useEffect(() => {
+    setLabelDrafts(
+      Object.fromEntries(
+        (labels?.data || []).map((label) => [
+          label.id,
+          {
+            name: label.name || '',
+            color: label.color || '#0d6efd',
+          },
+        ])
+      )
+    );
+    setLabelError('');
+    setLabelNotice('');
+  }, [labels?.data]);
+
+  useEffect(() => {
     setShowInvitePanel(false);
     setInviteQuery('');
     setInviteRole('member');
     setMemberError('');
     setMemberNotice('');
+    setSwimlaneError('');
+    setSwimlaneNotice('');
     setListError('');
     setListNotice('');
+    setLabelError('');
+    setLabelNotice('');
     setAutomationError('');
     setAutomationNotice('');
     setAutoAssignmentDrafts({});
     setListDrafts({});
+    setSwimlaneDrafts({});
+    setLabelDrafts({});
   }, [boardId]);
 
   const scrollToSection = (id: string) => {
@@ -1124,6 +1245,18 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
                            <h3 className="text-xl font-extrabold text-gray-900 mb-1.5 tracking-tight">Swimlanes Setup</h3>
                            <p className="text-[13px] text-gray-500 font-medium">Create horizontal swimlanes to group cards on your board.</p>
                         </div>
+
+                        {swimlaneError ? (
+                          <div className="mb-5 rounded-xl border border-[#ffd7d7] bg-[#fff5f5] px-4 py-3 text-sm font-semibold text-[#b42318]">
+                            {swimlaneError}
+                          </div>
+                        ) : null}
+
+                        {swimlaneNotice ? (
+                          <div className="mb-5 rounded-xl border border-[#d4f0dd] bg-[#edf9f1] px-4 py-3 text-sm font-semibold text-[#027a48]">
+                            {swimlaneNotice}
+                          </div>
+                        ) : null}
                         
                         <div className="flex items-center gap-3 mb-8 bg-[#f8fafc] p-3 rounded-2xl border border-gray-100/50 focus-within:border-[#0d6efd]/30 transition-colors">
                            <input
@@ -1152,17 +1285,82 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
                         </div>
 
                         <div className="grid grid-cols-1 gap-3">
-                           {swimlanes?.data?.map((swimlane: Swimlane) => (
-                              <div key={swimlane.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl hover:shadow-sm transition-shadow group">
-                                 <div className="flex items-center gap-3">
-                                    <div className="w-2.5 h-2.5 rounded-full ring-2 ring-gray-100" style={{ backgroundColor: swimlane.color || '#0d6efd' }} />
-                                    <span className="font-extrabold text-gray-800 text-[14px]">{swimlane.name}</span>
-                                 </div>
-                                 <button onClick={() => deleteSwimlaneMutation.mutate(swimlane.id)} className="text-gray-400 hover:text-red-500 uppercase tracking-widest text-[10px] font-extrabold border border-transparent hover:border-red-100 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100">
-                                    Delete
-                                 </button>
-                              </div>
-                           ))}
+                           {swimlanes?.data?.map((swimlane: Swimlane) => {
+                              const draft = swimlaneDrafts[swimlane.id] || {
+                                name: swimlane.name || '',
+                                color: swimlane.color || '#0d6efd',
+                              };
+                              const hasChanges =
+                                draft.name.trim() !== swimlane.name ||
+                                draft.color !== (swimlane.color || '#0d6efd');
+                              const isSaving =
+                                updateSwimlaneMutation.isPending &&
+                                updateSwimlaneMutation.variables?.id === swimlane.id;
+                              const isDeleting =
+                                deleteSwimlaneMutation.isPending &&
+                                deleteSwimlaneMutation.variables === swimlane.id;
+
+                              return (
+                                <div key={swimlane.id} className="grid gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm lg:grid-cols-[minmax(0,1fr)_120px_auto] lg:items-end">
+                                  <label className="block">
+                                    <span className="mb-3 block text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Swimlane Name</span>
+                                    <input
+                                      type="text"
+                                      value={draft.name}
+                                      disabled={!canManageMembers || isSaving || isDeleting}
+                                      onChange={(event) =>
+                                        setSwimlaneDrafts((current) => ({
+                                          ...current,
+                                          [swimlane.id]: {
+                                            ...draft,
+                                            name: event.target.value,
+                                          },
+                                        }))
+                                      }
+                                      className="h-12 w-full rounded-2xl border border-[#d9e3ef] bg-white px-4 text-[14px] font-semibold text-[#162231] outline-none transition focus:border-[#b7cbe0] disabled:cursor-not-allowed disabled:opacity-60"
+                                    />
+                                  </label>
+
+                                  <label className="block">
+                                    <span className="mb-3 block text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Color</span>
+                                    <input
+                                      type="color"
+                                      value={draft.color}
+                                      disabled={!canManageMembers || isSaving || isDeleting}
+                                      onChange={(event) =>
+                                        setSwimlaneDrafts((current) => ({
+                                          ...current,
+                                          [swimlane.id]: {
+                                            ...draft,
+                                            color: event.target.value,
+                                          },
+                                        }))
+                                      }
+                                      className="h-12 w-full cursor-pointer rounded-2xl border border-[#d9e3ef] bg-white p-2 disabled:cursor-not-allowed disabled:opacity-60"
+                                    />
+                                  </label>
+
+                                  <div className="flex items-center gap-3">
+                                    <button
+                                      type="button"
+                                      disabled={!canManageMembers || !draft.name.trim() || !hasChanges || isSaving || isDeleting}
+                                      onClick={() => updateSwimlaneMutation.mutate({ id: swimlane.id, name: draft.name, color: draft.color })}
+                                      className="px-4 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-bold hover:bg-black transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      {isSaving ? 'Saving...' : 'Save'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={!canManageMembers || isSaving || isDeleting}
+                                      onClick={() => deleteSwimlaneMutation.mutate(swimlane.id)}
+                                      className="px-4 py-2.5 rounded-xl bg-red-50 text-red-600 text-sm font-bold hover:bg-red-100 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      {isDeleting ? 'Deleting...' : 'Delete'}
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                           })}
                         </div>
                      </div>
 
@@ -1172,6 +1370,18 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
                            <h3 className="text-xl font-extrabold text-gray-900 mb-1.5 tracking-tight">Labels</h3>
                            <p className="text-[13px] text-gray-500 font-medium">Create customized tags to categorize your cards easily.</p>
                         </div>
+
+                        {labelError ? (
+                          <div className="mb-5 rounded-xl border border-[#ffd7d7] bg-[#fff5f5] px-4 py-3 text-sm font-semibold text-[#b42318]">
+                            {labelError}
+                          </div>
+                        ) : null}
+
+                        {labelNotice ? (
+                          <div className="mb-5 rounded-xl border border-[#d4f0dd] bg-[#edf9f1] px-4 py-3 text-sm font-semibold text-[#027a48]">
+                            {labelNotice}
+                          </div>
+                        ) : null}
                         
                         <div className="flex items-center gap-3 mb-8 bg-[#f8fafc] p-3 rounded-2xl border border-gray-100/50 focus-within:border-[#0d6efd]/30 transition-colors">
                            <input type="color" defaultValue="#0d6efd" className="w-10 h-10 rounded-xl cursor-pointer bg-transparent border-0 p-0" id="label-color" />
@@ -1203,15 +1413,81 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
                            </button>
                         </div>
 
-                        <div className="flex flex-wrap gap-3">
-                           {labels?.data?.map((label: Label) => (
-                              <div key={label.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-white font-extrabold text-[11px] uppercase tracking-wider shadow-sm group cursor-default" style={{ backgroundColor: label.color }}>
-                                 {label.name}
-                                 <button onClick={() => deleteLabelMutation.mutate(label.id)} className="w-4 h-4 rounded-full hover:bg-black/20 flex items-center justify-center transition-colors">
-                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-                                 </button>
-                              </div>
-                           ))}
+                        <div className="grid grid-cols-1 gap-3">
+                           {labels?.data?.map((label: Label) => {
+                              const draft = labelDrafts[label.id] || {
+                                name: label.name || '',
+                                color: label.color || '#0d6efd',
+                              };
+                              const hasChanges = draft.name.trim() !== label.name || draft.color !== label.color;
+                              const isSaving =
+                                updateLabelMutation.isPending &&
+                                updateLabelMutation.variables?.id === label.id;
+                              const isDeleting =
+                                deleteLabelMutation.isPending &&
+                                deleteLabelMutation.variables === label.id;
+
+                              return (
+                                <div key={label.id} className="grid gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm lg:grid-cols-[120px_minmax(0,1fr)_auto] lg:items-end">
+                                  <label className="block">
+                                    <span className="mb-3 block text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Color</span>
+                                    <input
+                                      type="color"
+                                      value={draft.color}
+                                      disabled={!canManageMembers || isSaving || isDeleting}
+                                      onChange={(event) =>
+                                        setLabelDrafts((current) => ({
+                                          ...current,
+                                          [label.id]: {
+                                            ...draft,
+                                            color: event.target.value,
+                                          },
+                                        }))
+                                      }
+                                      className="h-12 w-full cursor-pointer rounded-2xl border border-[#d9e3ef] bg-white p-2 disabled:cursor-not-allowed disabled:opacity-60"
+                                    />
+                                  </label>
+
+                                  <label className="block">
+                                    <span className="mb-3 block text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Label Name</span>
+                                    <input
+                                      type="text"
+                                      value={draft.name}
+                                      disabled={!canManageMembers || isSaving || isDeleting}
+                                      onChange={(event) =>
+                                        setLabelDrafts((current) => ({
+                                          ...current,
+                                          [label.id]: {
+                                            ...draft,
+                                            name: event.target.value,
+                                          },
+                                        }))
+                                      }
+                                      className="h-12 w-full rounded-2xl border border-[#d9e3ef] bg-white px-4 text-[14px] font-semibold text-[#162231] outline-none transition focus:border-[#b7cbe0] disabled:cursor-not-allowed disabled:opacity-60"
+                                    />
+                                  </label>
+
+                                  <div className="flex items-center gap-3">
+                                    <button
+                                      type="button"
+                                      disabled={!canManageMembers || !draft.name.trim() || !hasChanges || isSaving || isDeleting}
+                                      onClick={() => updateLabelMutation.mutate({ id: label.id, name: draft.name, color: draft.color })}
+                                      className="px-4 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-bold hover:bg-black transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      {isSaving ? 'Saving...' : 'Save'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={!canManageMembers || isSaving || isDeleting}
+                                      onClick={() => deleteLabelMutation.mutate(label.id)}
+                                      className="px-4 py-2.5 rounded-xl bg-red-50 text-red-600 text-sm font-bold hover:bg-red-100 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      {isDeleting ? 'Deleting...' : 'Delete'}
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                           })}
                         </div>
                      </div>
 
