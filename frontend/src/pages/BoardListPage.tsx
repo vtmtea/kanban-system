@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Sidebar } from '@/components/Sidebar';
 import { TopNav } from '@/components/TopNav';
+import { useI18n } from '@/context/I18nContext';
 import { projectApi } from '@/services/api';
 import type { Project } from '@/types';
 
@@ -21,6 +22,7 @@ const statusClasses: Record<string, string> = {
 };
 
 export function BoardListPage() {
+  const { t } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
   const [pageNotice, setPageNotice] = useState('');
@@ -51,15 +53,14 @@ export function BoardListPage() {
       <Sidebar activePage="projects" />
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f7fbff]">
-        <TopNav title="" searchPlaceholder="Search projects..." />
-
+        <TopNav title="" searchPlaceholder={t('boardList.searchPlaceholder')} />
         <div className="flex-1 overflow-auto px-10 pb-10 pt-8">
           <div className="mx-auto max-w-[1240px]">
             <div className="mb-10 flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
               <div>
-                <h1 className="text-[38px] font-extrabold tracking-tight text-[#162231]">Projects</h1>
+                <h1 className="text-[38px] font-extrabold tracking-tight text-[#162231]">{t('boardList.title')}</h1>
                 <p className="mt-2 text-[17px] font-medium text-[#5b6b80]">
-                  Projects are the parent layer above boards. Create one, then organize delivery inside its boards.
+                  {t('boardList.desc')}
                 </p>
               </div>
 
@@ -68,11 +69,11 @@ export function BoardListPage() {
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M3 5h18M6 12h12M10 19h4" />
                   </svg>
-                  All Projects
+                  {t('boardList.allProjects')}
                 </button>
                 <Link to="/projects/new" className="flex h-14 items-center gap-3 rounded-2xl bg-[#0f4fe6] px-7 text-[16px] font-bold text-white shadow-[0_16px_32px_rgba(15,79,230,0.24)]">
                   <span className="text-[26px] leading-none">+</span>
-                  New Project
+                  {t('boardList.newProject')}
                 </Link>
               </div>
             </div>
@@ -85,7 +86,7 @@ export function BoardListPage() {
                   onClick={() => setPageNotice('')}
                   className="text-[13px] font-extrabold text-[#027a48] transition hover:opacity-70"
                 >
-                  Dismiss
+                  {t('common.dismiss')}
                 </button>
               </div>
             ) : null}
@@ -103,29 +104,29 @@ export function BoardListPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                   </svg>
                 </div>
-                <h2 className="mt-6 text-[24px] font-extrabold text-[#162231]">No projects yet</h2>
+                <h2 className="mt-6 text-[24px] font-extrabold text-[#162231]">{t('boardList.noProjectsTitle')}</h2>
                 <p className="mx-auto mt-3 max-w-[520px] text-[15px] font-medium leading-7 text-[#5b6b80]">
-                  Start by creating a project. Boards, lists, and delivery workflows will live underneath it.
+                  {t('boardList.noProjectsDesc')}
                 </p>
                 <Link to="/projects/new" className="mt-8 inline-flex items-center gap-3 rounded-2xl bg-[#0f4fe6] px-7 py-4 text-[16px] font-bold text-white shadow-[0_16px_32px_rgba(15,79,230,0.24)]">
-                  Create Project
+                  {t('boardList.createProject')}
                 </Link>
               </div>
             ) : (
               <>
                 <div className="mb-8 grid gap-6 md:grid-cols-3">
                   <section className="rounded-[30px] bg-[#eef4fa] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-                    <p className="text-[13px] font-extrabold tracking-[0.15em] text-[#4e5f74]">TOTAL PROJECTS</p>
+                    <p className="text-[13px] font-extrabold tracking-[0.15em] text-[#4e5f74]">{t('boardList.totalProjects')}</p>
                     <p className="mt-4 text-[52px] font-extrabold leading-none tracking-tight text-[#162231]">{projects.length}</p>
                   </section>
                   <section className="rounded-[30px] bg-[#eef4fa] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-                    <p className="text-[13px] font-extrabold tracking-[0.15em] text-[#4e5f74]">ACTIVE NOW</p>
+                    <p className="text-[13px] font-extrabold tracking-[0.15em] text-[#4e5f74]">{t('boardList.activeNow')}</p>
                     <p className="mt-4 text-[52px] font-extrabold leading-none tracking-tight text-[#162231]">
                       {projects.filter((project) => project.status === 'active').length}
                     </p>
                   </section>
                   <section className="rounded-[30px] bg-[#eef4fa] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-                    <p className="text-[13px] font-extrabold tracking-[0.15em] text-[#4e5f74]">BOARDS LINKED</p>
+                    <p className="text-[13px] font-extrabold tracking-[0.15em] text-[#4e5f74]">{t('boardList.boardsLinked')}</p>
                     <p className="mt-4 text-[52px] font-extrabold leading-none tracking-tight text-[#162231]">
                       {projects.reduce((sum, project) => sum + (project.boards?.length || 0), 0)}
                     </p>
@@ -155,37 +156,37 @@ export function BoardListPage() {
                             </div>
                             <div>
                               <h3 className="text-[20px] font-extrabold text-[#162231]">{project.title}</h3>
-                              <p className="mt-1 text-[14px] font-medium text-[#5b6b80]">{project.owner?.nickname || project.owner?.username || 'Owner'}</p>
+                              <p className="mt-1 text-[14px] font-medium text-[#5b6b80]">{project.owner?.nickname || project.owner?.username || t('boardList.ownerFallback')}</p>
                             </div>
                           </div>
                           <div className="space-y-2 text-right">
                             <span className={`inline-flex rounded-xl px-3 py-1.5 text-[12px] font-bold ${priorityClass}`}>
-                              {(project.priority || 'medium').toUpperCase()}
+                              {t(`boardList.priority.${project.priority || 'medium'}`)}
                             </span>
                             <div className={`rounded-xl px-3 py-1.5 text-[12px] font-bold ${statusClass}`}>
-                              {(project.status || 'planning').toUpperCase()}
+                              {t(`boardList.status.${project.status || 'planning'}`)}
                             </div>
                           </div>
                         </div>
 
                         <p className="mb-8 min-h-[72px] text-[14px] font-medium leading-7 text-[#5b6b80]">
-                          {project.description || 'No description yet.'}
+                          {project.description || t('boardList.noDescription')}
                         </p>
 
                         <div className="mb-6 grid grid-cols-2 gap-4">
                           <div className="rounded-[22px] bg-[#eef4fa] px-5 py-4">
-                            <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#4e5f74]">Boards</div>
+                            <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#4e5f74]">{t('boardList.boards')}</div>
                             <div className="mt-3 text-[28px] font-extrabold text-[#162231]">{boardCount}</div>
                           </div>
                           <div className="rounded-[22px] bg-[#eef4fa] px-5 py-4">
-                            <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#4e5f74]">Target</div>
-                            <div className="mt-3 text-[16px] font-extrabold text-[#162231]">{project.target_date || 'Not set'}</div>
+                            <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#4e5f74]">{t('boardList.target')}</div>
+                            <div className="mt-3 text-[16px] font-extrabold text-[#162231]">{project.target_date || t('common.notSet')}</div>
                           </div>
                         </div>
 
                         <div className="flex items-center justify-between text-[13px] font-semibold text-[#5b6b80]">
-                          <span>Start {project.start_date || 'TBD'}</span>
-                          <span>Open Project</span>
+                          <span>{t('boardList.startDate', { date: project.start_date || t('common.tbd') })}</span>
+                          <span>{t('boardList.openProject')}</span>
                         </div>
                       </Link>
                     );

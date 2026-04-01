@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SelectField } from '@/components/SelectField';
+import { useI18n } from '@/context/I18nContext';
 import { boardApi, projectApi } from '@/services/api';
 import type { CreateBoardRequest } from '@/types';
 
@@ -11,18 +12,8 @@ interface CreateBoardModalProps {
   onCreated?: (boardId: number) => void;
 }
 
-const colors = [
-  { name: '蓝色', value: '#3B82F6' },
-  { name: '紫色', value: '#8B5CF6' },
-  { name: '粉色', value: '#EC4899' },
-  { name: '红色', value: '#EF4444' },
-  { name: '橙色', value: '#F97316' },
-  { name: '黄色', value: '#EAB308' },
-  { name: '绿色', value: '#22C55E' },
-  { name: '青色', value: '#06B6D4' },
-];
-
 export function CreateBoardModal({ isOpen, onClose, projectId, onCreated }: CreateBoardModalProps) {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const hasFixedProject = projectId !== undefined;
   const [form, setForm] = useState<CreateBoardRequest>({
@@ -43,9 +34,9 @@ export function CreateBoardModal({ isOpen, onClose, projectId, onCreated }: Crea
   const projectOptions = useMemo(() => {
     const options = [
       {
-        label: 'Standalone Board',
+        label: t('createBoard.standalone'),
         value: 'none',
-        description: 'Create a board without attaching it to a project.',
+        description: t('createBoard.standaloneDesc'),
       },
     ];
 
@@ -53,12 +44,26 @@ export function CreateBoardModal({ isOpen, onClose, projectId, onCreated }: Crea
       options.push({
         label: project.title,
         value: String(project.id),
-        description: project.description || 'Attach this board to an existing project.',
+        description: project.description || t('createBoard.attachProject'),
       });
     }
 
     return options;
-  }, [projectsResponse?.data]);
+  }, [projectsResponse?.data, t]);
+
+  const colors = useMemo(
+    () => [
+      { name: t('createBoard.color.blue'), value: '#3B82F6' },
+      { name: t('createBoard.color.purple'), value: '#8B5CF6' },
+      { name: t('createBoard.color.pink'), value: '#EC4899' },
+      { name: t('createBoard.color.red'), value: '#EF4444' },
+      { name: t('createBoard.color.orange'), value: '#F97316' },
+      { name: t('createBoard.color.yellow'), value: '#EAB308' },
+      { name: t('createBoard.color.green'), value: '#22C55E' },
+      { name: t('createBoard.color.cyan'), value: '#06B6D4' },
+    ],
+    [t]
+  );
 
   useEffect(() => {
     setForm((current) => ({
@@ -79,7 +84,7 @@ export function CreateBoardModal({ isOpen, onClose, projectId, onCreated }: Crea
       handleClose();
     },
     onError: (err: any) => {
-      setError(err.response?.data?.error || '创建失败');
+      setError(err.response?.data?.error || t('createBoard.errorFailed'));
     },
   });
 
@@ -92,7 +97,7 @@ export function CreateBoardModal({ isOpen, onClose, projectId, onCreated }: Crea
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim()) {
-      setError('请输入看板标题');
+      setError(t('createBoard.errorTitleRequired'));
       return;
     }
 
@@ -135,7 +140,7 @@ export function CreateBoardModal({ isOpen, onClose, projectId, onCreated }: Crea
             <input
               type="text"
               className="w-full px-4 py-3 border border-gray-200 rounded-xl text-lg font-medium focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all shadow-sm"
-              placeholder="看板标题"
+              placeholder={t('createBoard.titlePlaceholder')}
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               autoFocus
@@ -145,7 +150,7 @@ export function CreateBoardModal({ isOpen, onClose, projectId, onCreated }: Crea
           <div className="mb-5">
             <textarea
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all resize-none"
-              placeholder="添加描述（可选）"
+              placeholder={t('createBoard.descPlaceholder')}
               rows={3}
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -154,7 +159,7 @@ export function CreateBoardModal({ isOpen, onClose, projectId, onCreated }: Crea
 
           {/* Color Picker */}
           <div className="mb-5">
-            <label className="block text-sm font-medium text-gray-700 mb-3">选择颜色</label>
+            <label className="block text-sm font-medium text-gray-700 mb-3">{t('createBoard.color')}</label>
             <div className="flex flex-wrap gap-2">
               {colors.map((color) => (
                 <button
@@ -175,11 +180,11 @@ export function CreateBoardModal({ isOpen, onClose, projectId, onCreated }: Crea
 
           {hasFixedProject ? (
             <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
-              该看板会自动归属到当前 Project。
+              {t('createBoard.attachedCurrentProject')}
             </div>
           ) : (
             <div className="mb-5">
-              <label className="mb-3 block text-sm font-medium text-gray-700">归属项目</label>
+              <label className="mb-3 block text-sm font-medium text-gray-700">{t('createBoard.project')}</label>
               <SelectField
                 options={projectOptions}
                 value={form.project_id ? String(form.project_id) : 'none'}
@@ -189,7 +194,7 @@ export function CreateBoardModal({ isOpen, onClose, projectId, onCreated }: Crea
                     project_id: nextValue === 'none' ? undefined : Number(nextValue),
                   }))
                 }
-                placeholder="选择一个项目"
+                placeholder={t('createBoard.projectPlaceholder')}
                 size="lg"
               />
             </div>
@@ -205,14 +210,14 @@ export function CreateBoardModal({ isOpen, onClose, projectId, onCreated }: Crea
               onClick={handleClose}
               className="flex-1 py-2.5 px-4 border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 transition-colors"
             >
-              取消
+              {t('createBoard.cancel')}
             </button>
             <button
               type="submit"
               disabled={createMutation.isPending}
               className="flex-1 py-2.5 px-4 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {createMutation.isPending ? '创建中...' : '创建看板'}
+              {createMutation.isPending ? t('createBoard.submitting') : t('createBoard.submit')}
             </button>
           </div>
         </form>

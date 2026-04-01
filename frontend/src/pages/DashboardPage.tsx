@@ -4,6 +4,7 @@ import { boardApi, projectApi, resolveAssetUrl } from '@/services/api';
 import { Sidebar } from '@/components/Sidebar';
 import { TopNav } from '@/components/TopNav';
 import { useAuth } from '@/context/AuthContext';
+import { useI18n } from '@/context/I18nContext';
 import type { Activity, Board, Card, Project } from '@/types';
 
 type ActivityWithBoard = Activity & {
@@ -17,39 +18,6 @@ type BoardCardSummary = Card & {
   projectId?: number | null;
   projectTitle: string;
 };
-
-function formatRelativeTime(value?: string | null) {
-  if (!value) return 'Just now';
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Just now';
-
-  const diffMs = date.getTime() - Date.now();
-  const diffMinutes = Math.round(diffMs / (1000 * 60));
-  const absMinutes = Math.abs(diffMinutes);
-
-  const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-
-  if (absMinutes < 60) return rtf.format(Math.round(diffMinutes), 'minute');
-
-  const diffHours = Math.round(diffMinutes / 60);
-  if (Math.abs(diffHours) < 24) return rtf.format(diffHours, 'hour');
-
-  const diffDays = Math.round(diffHours / 24);
-  return rtf.format(diffDays, 'day');
-}
-
-function formatShortDate(value?: string | null) {
-  if (!value) return 'No due date';
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'No due date';
-
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-  }).format(date);
-}
 
 function isOverdue(value?: string | null) {
   if (!value) return false;
@@ -70,10 +38,6 @@ function isDueSoon(value?: string | null) {
   const nextWeek = now + 7 * 24 * 60 * 60 * 1000;
 
   return dueDate.getTime() >= now && dueDate.getTime() <= nextWeek;
-}
-
-function getUserDisplayName(activity: ActivityWithBoard) {
-  return activity.user?.nickname || activity.user?.username || 'A teammate';
 }
 
 function getBoardInitial(board: Board) {
@@ -119,7 +83,43 @@ async function loadDashboardData() {
 
 export function DashboardPage() {
   const { user } = useAuth();
+  const { t, formatRelativeTime, formatDate } = useI18n();
   const displayName = user?.nickname || user?.username || 'there';
+
+  const getUserDisplayName = (activity: ActivityWithBoard) => (
+    activity.user?.nickname || activity.user?.username || t('dashboard.aTeammate')
+  );
+
+  const formatRelativeLabel = (value?: string | null) => {
+    if (!value) return t('common.justNow');
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return t('common.justNow');
+
+    const diffMs = date.getTime() - Date.now();
+    const diffMinutes = Math.round(diffMs / (1000 * 60));
+    const absMinutes = Math.abs(diffMinutes);
+
+    if (absMinutes < 60) return formatRelativeTime(Math.round(diffMinutes), 'minute');
+
+    const diffHours = Math.round(diffMinutes / 60);
+    if (Math.abs(diffHours) < 24) return formatRelativeTime(diffHours, 'hour');
+
+    const diffDays = Math.round(diffHours / 24);
+    return formatRelativeTime(diffDays, 'day');
+  };
+
+  const formatShortDate = (value?: string | null) => {
+    if (!value) return t('common.noDueDate');
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return t('common.noDueDate');
+
+    return formatDate(date, {
+      month: 'short',
+      day: 'numeric',
+    });
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard-overview'],
@@ -131,7 +131,7 @@ export function DashboardPage() {
   const projectLookup = new Map<number, Project>(projects.map((project) => [project.id, project]));
 
   const allCards: BoardCardSummary[] = boards.flatMap((board) => {
-    const projectTitle = board.project_id ? projectLookup.get(board.project_id)?.title || `Project #${board.project_id}` : 'Standalone Board';
+    const projectTitle = board.project_id ? projectLookup.get(board.project_id)?.title || `Project #${board.project_id}` : t('dashboard.standaloneBoard');
     return (board.lists || []).flatMap((list) =>
       (list.cards || []).map((card) => ({
         ...card,
@@ -169,7 +169,7 @@ export function DashboardPage() {
         <main className="flex min-w-0 flex-1 items-center justify-center bg-[#f7fbff]">
           <div className="flex flex-col items-center gap-3">
             <div className="h-8 w-8 rounded-full border-4 border-[#0f4fe6] border-t-transparent animate-spin"></div>
-            <div className="text-sm font-semibold tracking-wider text-[#5b6b80] animate-pulse">LOADING DASHBOARD...</div>
+            <div className="text-sm font-semibold tracking-wider text-[#5b6b80] animate-pulse">{t('dashboard.loading').toUpperCase()}</div>
           </div>
         </main>
       </div>
@@ -181,7 +181,7 @@ export function DashboardPage() {
       <div className="flex h-screen bg-[#eef4fa] font-sans text-[#162231]">
         <Sidebar activePage="dashboard" />
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f7fbff]">
-          <TopNav title="" searchPlaceholder="Search workspace..." />
+          <TopNav title="" searchPlaceholder={t('dashboard.searchPlaceholder')} />
           <div className="flex-1 overflow-auto px-10 pb-10 pt-8">
             <div className="mx-auto flex max-w-[900px] flex-col items-center justify-center rounded-[2.25rem] border border-dashed border-[#d7e3ef] bg-white px-10 py-24 text-center shadow-[0_18px_40px_rgba(15,23,42,0.05)]">
               <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-[#d9e6fb] text-[#0f4fe6]">
@@ -189,16 +189,16 @@ export function DashboardPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h16M4 17h10" />
                 </svg>
               </div>
-              <h1 className="text-[38px] font-extrabold tracking-tight text-[#162231]">Your workspace is ready for its first board</h1>
+              <h1 className="text-[38px] font-extrabold tracking-tight text-[#162231]">{t('dashboard.emptyTitle')}</h1>
               <p className="mt-3 max-w-2xl text-[16px] leading-8 text-[#5b6b80]">
-                Create a project or open the boards hub to start tracking tasks, collecting activity history, and generating analytics.
+                {t('dashboard.emptyDesc')}
               </p>
               <div className="mt-8 flex gap-4">
                 <Link to="/projects/new" className="rounded-2xl bg-[#0f4fe6] px-7 py-3 text-sm font-bold text-white shadow-[0_16px_32px_rgba(15,79,230,0.24)]">
-                  New Project
+                  {t('dashboard.newProject')}
                 </Link>
                 <Link to="/boards" className="rounded-2xl border border-[#d9e3ef] bg-white px-7 py-3 text-sm font-bold text-[#162231]">
-                  Browse Boards
+                  {t('dashboard.browseBoards')}
                 </Link>
               </div>
             </div>
@@ -213,17 +213,17 @@ export function DashboardPage() {
       <Sidebar activePage="dashboard" />
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f7fbff]">
-        <TopNav title="" searchPlaceholder="Search workspace..." />
+        <TopNav title="" searchPlaceholder={t('dashboard.searchPlaceholder')} />
 
         <div className="flex-1 overflow-auto px-10 pb-10 pt-8">
           <div className="mx-auto max-w-[1240px]">
             <div className="mb-10 flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
               <div>
-                <h1 className="text-[38px] font-extrabold tracking-tight text-[#162231]">Welcome back, {displayName}</h1>
+                <h1 className="text-[38px] font-extrabold tracking-tight text-[#162231]">{t('dashboard.welcomeBack', { name: displayName })}</h1>
                 <p className="mt-2 text-[17px] font-medium text-[#5b6b80]">
                   {overdueCards.length > 0
-                    ? `${overdueCards.length} overdue tasks need attention across your boards.`
-                    : `${dueSoonCards.length} tasks are due within the next 7 days.`}
+                    ? t('dashboard.overdueSummary', { count: overdueCards.length })
+                    : t('dashboard.dueSoonSummary', { count: dueSoonCards.length })}
                 </p>
               </div>
 
@@ -235,14 +235,14 @@ export function DashboardPage() {
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M4 7h16M4 12h16M4 17h10" />
                   </svg>
-                  Open Boards
+                  {t('dashboard.openBoards')}
                 </Link>
                 <Link
                   to="/projects/new"
                   className="flex h-14 items-center gap-3 rounded-2xl bg-[#0f4fe6] px-7 text-[16px] font-bold text-white shadow-[0_16px_32px_rgba(15,79,230,0.28)]"
                 >
                   <span className="text-[26px] leading-none">+</span>
-                  New Project
+                  {t('dashboard.newProject')}
                 </Link>
               </div>
             </div>
@@ -251,10 +251,10 @@ export function DashboardPage() {
               <div className="min-w-0">
                 <div className="mb-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
                   {[
-                    { title: 'Projects', value: projects.length, badge: 'Workspace', badgeClass: 'bg-[#dfe7ff] text-[#0f4fe6]', iconClass: 'bg-[#d9e6fb] text-[#0f4fe6]' },
-                    { title: 'Boards', value: boards.length, badge: 'Active', badgeClass: 'bg-[#eef4fa] text-[#4c6078]', iconClass: 'bg-[#dfe5ea] text-[#5f718b]' },
-                    { title: 'Open Tasks', value: openCards, badge: `${dueSoonCards.length} Due Soon`, badgeClass: 'bg-[#fff2e2] text-[#a65612]', iconClass: 'bg-[#ece5de] text-[#a65612]' },
-                    { title: 'Completed Tasks', value: completedCards, badge: `${collaboratorCount} Collaborators`, badgeClass: 'bg-[#e3f8ec] text-[#137a4b]', iconClass: 'bg-[#d9f2e4] text-[#137a4b]' },
+                    { title: t('dashboard.projectsMetric'), value: projects.length, badge: t('dashboard.workspaceBadge'), badgeClass: 'bg-[#dfe7ff] text-[#0f4fe6]', iconClass: 'bg-[#d9e6fb] text-[#0f4fe6]' },
+                    { title: t('dashboard.boardsMetric'), value: boards.length, badge: t('dashboard.activeBadge'), badgeClass: 'bg-[#eef4fa] text-[#4c6078]', iconClass: 'bg-[#dfe5ea] text-[#5f718b]' },
+                    { title: t('dashboard.openTasksMetric'), value: openCards, badge: t('dashboard.dueSoonBadge', { count: dueSoonCards.length }), badgeClass: 'bg-[#fff2e2] text-[#a65612]', iconClass: 'bg-[#ece5de] text-[#a65612]' },
+                    { title: t('dashboard.completedTasksMetric'), value: completedCards, badge: t('dashboard.collaboratorsBadge', { count: collaboratorCount }), badgeClass: 'bg-[#e3f8ec] text-[#137a4b]', iconClass: 'bg-[#d9f2e4] text-[#137a4b]' },
                   ].map((item) => (
                     <section key={item.title} className="rounded-[30px] bg-[#eef4fa] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
                       <div className="mb-7 flex items-start justify-between">
@@ -273,8 +273,8 @@ export function DashboardPage() {
 
                 <section className="mb-8">
                   <div className="mb-6 flex items-center justify-between">
-                    <h2 className="text-[20px] font-extrabold text-[#162231]">Active Boards</h2>
-                    <Link to="/boards" className="text-[14px] font-bold text-[#0f4fe6] hover:underline">View all boards</Link>
+                    <h2 className="text-[20px] font-extrabold text-[#162231]">{t('dashboard.activeBoards')}</h2>
+                    <Link to="/boards" className="text-[14px] font-bold text-[#0f4fe6] hover:underline">{t('dashboard.viewAllBoards')}</Link>
                   </div>
 
                   <div className="grid gap-6 lg:grid-cols-2">
@@ -301,12 +301,12 @@ export function DashboardPage() {
                               <div>
                                 <h3 className="text-[20px] font-extrabold text-[#162231]">{board.title}</h3>
                                 <p className="mt-1 text-[14px] font-medium text-[#5b6b80]">
-                                  {board.project_id ? projectLookup.get(board.project_id)?.title || `Project #${board.project_id}` : 'Standalone Board'}
+                                  {board.project_id ? projectLookup.get(board.project_id)?.title || `Project #${board.project_id}` : t('dashboard.standaloneBoard')}
                                 </p>
                               </div>
                             </div>
                             <div className="rounded-xl bg-[#eef4fa] px-3 py-1.5 text-[12px] font-bold text-[#4c6078]">
-                              {boardCards.length} cards
+                              {t('dashboard.cardsCount', { count: boardCards.length })}
                             </div>
                           </div>
 
@@ -338,7 +338,7 @@ export function DashboardPage() {
                           </div>
 
                           <div className="mb-2 flex items-center justify-between text-[14px] font-semibold text-[#4d5d72]">
-                            <span>Completion</span>
+                            <span>{t('dashboard.completion')}</span>
                             <span>{progress}%</span>
                           </div>
                           <div className="h-2 rounded-full bg-[#e8eef5]">
@@ -352,15 +352,15 @@ export function DashboardPage() {
 
                 <section className="rounded-[34px] bg-[#eef4fa] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
                   <div className="mb-8 flex items-center justify-between">
-                    <h2 className="text-[20px] font-extrabold text-[#162231]">Recent Activity</h2>
+                    <h2 className="text-[20px] font-extrabold text-[#162231]">{t('dashboard.recentActivity')}</h2>
                     <Link to="/boards" className="text-[13px] font-bold text-[#0f4fe6] hover:underline">
-                      Open activity feeds
+                      {t('dashboard.openActivityFeeds')}
                     </Link>
                   </div>
 
                   {recentActivities.length === 0 ? (
                     <div className="rounded-[26px] bg-white p-8 text-center text-[15px] font-medium text-[#5b6b80] shadow-sm">
-                      Activity will appear here as your team creates cards, comments, and moves work across boards.
+                      {t('dashboard.recentActivityEmpty')}
                     </div>
                   ) : (
                     <div className="space-y-8">
@@ -381,7 +381,7 @@ export function DashboardPage() {
                               </span>
                             </p>
                             <p className="mt-4 text-[12px] font-extrabold tracking-[0.2em] text-[#687a92]">
-                              {formatRelativeTime(activity.created_at)}
+                              {formatRelativeLabel(activity.created_at)}
                             </p>
                           </div>
                         </div>
@@ -394,16 +394,16 @@ export function DashboardPage() {
               <aside className="space-y-8">
                 <section className="rounded-[34px] bg-[#eef4fa] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
                   <div className="mb-6 flex items-center justify-between">
-                    <h2 className="text-[20px] font-extrabold text-[#162231]">Priority Focus</h2>
+                    <h2 className="text-[20px] font-extrabold text-[#162231]">{t('dashboard.priorityFocus')}</h2>
                     <span className="rounded-full bg-[#ff7d1f] px-3 py-1 text-[12px] font-extrabold text-[#321300]">
-                      {overdueCards.length > 0 ? 'URGENT' : 'UP NEXT'}
+                      {overdueCards.length > 0 ? t('dashboard.urgent') : t('dashboard.upNext')}
                     </span>
                   </div>
 
                   <div className="space-y-5">
                     {focusCards.length === 0 ? (
                       <div className="rounded-[26px] bg-white p-6 text-sm font-medium leading-7 text-[#5b6b80] shadow-sm">
-                        No urgent cards right now. Your workspace is caught up for the moment.
+                        {t('dashboard.noUrgentCards')}
                       </div>
                     ) : (
                       focusCards.map((card) => (
@@ -423,7 +423,9 @@ export function DashboardPage() {
                             </div>
                           </div>
                           <div className="inline-flex rounded-full bg-[#eef4fa] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-[#4c6078]">
-                            {isOverdue(card.due_date) ? `Overdue • ${formatShortDate(card.due_date)}` : `Due • ${formatShortDate(card.due_date)}`}
+                            {isOverdue(card.due_date)
+                              ? t('dashboard.overdueOn', { date: formatShortDate(card.due_date) })
+                              : t('dashboard.dueOn', { date: formatShortDate(card.due_date) })}
                           </div>
                         </Link>
                       ))
@@ -433,22 +435,22 @@ export function DashboardPage() {
 
                 <section className="rounded-[34px] bg-[#eef4fa] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
                   <div className="mb-6 flex items-center justify-between">
-                    <h2 className="text-[20px] font-extrabold text-[#162231]">Upcoming Deadlines</h2>
+                    <h2 className="text-[20px] font-extrabold text-[#162231]">{t('dashboard.upcomingDeadlines')}</h2>
                     <span className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#687a92]">
-                      {upcomingDeadlines.length} cards
+                      {t('dashboard.tasksCount', { count: upcomingDeadlines.length })}
                     </span>
                   </div>
 
                   <div className="space-y-4">
                     {upcomingDeadlines.length === 0 ? (
                       <div className="rounded-[26px] bg-white p-6 text-sm font-medium leading-7 text-[#5b6b80] shadow-sm">
-                        No upcoming deadlines were found in the next window of open work.
+                        {t('dashboard.noUpcomingDeadlines')}
                       </div>
                     ) : (
                       upcomingDeadlines.map((card) => (
                         <Link key={card.id} to={`/boards/${card.boardId}`} className="flex items-center gap-4 rounded-[24px] bg-white p-4 shadow-sm transition hover:-translate-y-0.5">
                           <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-[18px] bg-[#d9e6fb] text-[#0f4fe6]">
-                            <span className="text-[11px] font-bold uppercase tracking-[0.16em]">Due</span>
+                            <span className="text-[11px] font-bold uppercase tracking-[0.16em]">{t('dashboard.due')}</span>
                             <span className="text-[18px] font-extrabold leading-none">{formatShortDate(card.due_date).split(' ')[1] || '--'}</span>
                           </div>
                           <div className="min-w-0">

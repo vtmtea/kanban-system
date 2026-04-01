@@ -3,29 +3,14 @@ import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { Sidebar } from '@/components/Sidebar';
 import { TopNav } from '@/components/TopNav';
+import { LanguageToggle } from '@/components/LanguageToggle';
 import { SelectField } from '@/components/SelectField';
 import { useAuth } from '@/context/AuthContext';
+import { useI18n } from '@/context/I18nContext';
 import { authApi, resolveAssetUrl } from '@/services/api';
 
 const workspaceSettingsStorageKey = 'settings.workspace';
 const notificationSettingsStorageKey = 'settings.notifications';
-
-const timezoneOptions = [
-  { value: 'Asia/Shanghai', label: 'Asia/Shanghai', description: 'Use your local timezone for dates and due reminders.' },
-  { value: 'UTC', label: 'UTC', description: 'Keep timestamps normalized for distributed collaboration.' },
-  { value: 'America/New_York', label: 'America/New_York', description: 'Useful when your team primarily works in EST/EDT.' },
-  { value: 'Europe/Berlin', label: 'Europe/Berlin', description: 'Helpful when collaborating across CET/CEST schedules.' },
-];
-
-const weekStartOptions = [
-  { value: 'monday', label: 'Monday', description: 'Align planning around a Monday-first work week.' },
-  { value: 'sunday', label: 'Sunday', description: 'Use a Sunday-first calendar layout.' },
-];
-
-const densityOptions = [
-  { value: 'comfortable', label: 'Comfortable', description: 'More whitespace for relaxed scanning.' },
-  { value: 'compact', label: 'Compact', description: 'Fit more information on screen at once.' },
-];
 
 const defaultWorkspaceSettings = {
   timezone:
@@ -46,16 +31,11 @@ const defaultNotificationSettings = {
 };
 
 function formatDateLabel(value?: string) {
-  if (!value) return 'Unavailable';
+  if (!value) return null;
 
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Unavailable';
-
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  }).format(date);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
 }
 
 function Toggle({
@@ -87,6 +67,7 @@ function Toggle({
 
 export function SettingsPage() {
   const { user, token, login, loading } = useAuth();
+  const { t, formatDate } = useI18n();
   const [activeSection, setActiveSection] = useState('profile');
   const [profileForm, setProfileForm] = useState({ nickname: '', avatar: '' });
   const [profileSnapshot, setProfileSnapshot] = useState({ nickname: '', avatar: '' });
@@ -98,6 +79,29 @@ export function SettingsPage() {
   const [profileError, setProfileError] = useState('');
   const [workspaceNotice, setWorkspaceNotice] = useState('');
   const [notificationNotice, setNotificationNotice] = useState('');
+  const timezoneOptions = useMemo(
+    () => [
+      { value: 'Asia/Shanghai', label: 'Asia/Shanghai', description: t('settings.timezone.local') },
+      { value: 'UTC', label: 'UTC', description: t('settings.timezone.utc') },
+      { value: 'America/New_York', label: 'America/New_York', description: t('settings.timezone.ny') },
+      { value: 'Europe/Berlin', label: 'Europe/Berlin', description: t('settings.timezone.berlin') },
+    ],
+    [t]
+  );
+  const weekStartOptions = useMemo(
+    () => [
+      { value: 'monday', label: t('settings.weekStart.monday'), description: t('settings.weekStart.mondayDesc') },
+      { value: 'sunday', label: t('settings.weekStart.sunday'), description: t('settings.weekStart.sundayDesc') },
+    ],
+    [t]
+  );
+  const densityOptions = useMemo(
+    () => [
+      { value: 'comfortable', label: t('settings.density.comfortable'), description: t('settings.density.comfortableDesc') },
+      { value: 'compact', label: t('settings.density.compact'), description: t('settings.density.compactDesc') },
+    ],
+    [t]
+  );
 
   const scrollToSection = (id: string) => {
     setActiveSection(id);
@@ -164,11 +168,11 @@ export function SettingsPage() {
       setProfileForm(nextProfile);
       setProfileSnapshot(nextProfile);
       setProfileError('');
-      setProfileNotice('Profile details updated.');
+      setProfileNotice(t('settings.profileUpdated'));
     },
     onError: (error: any) => {
       setProfileNotice('');
-      setProfileError(error.response?.data?.error || 'Failed to update profile');
+      setProfileError(error.response?.data?.error || t('settings.profileUpdateFailed'));
     },
   });
 
@@ -199,7 +203,7 @@ export function SettingsPage() {
         <main className="flex-1 flex items-center justify-center bg-[#fbfcfd]">
           <div className="flex flex-col items-center gap-3">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#0d6efd] border-t-transparent" />
-            <div className="text-sm font-semibold tracking-wider text-gray-500">LOADING SETTINGS...</div>
+            <div className="text-sm font-semibold tracking-wider text-gray-500">{t('settings.loading').toUpperCase()}</div>
           </div>
         </main>
       </div>
@@ -211,7 +215,7 @@ export function SettingsPage() {
       <Sidebar activePage="settings" />
 
       <main className="flex flex-1 flex-col bg-white">
-        <TopNav title="Settings" searchPlaceholder="Search settings..." />
+        <TopNav title={t('settings.title')} searchPlaceholder={t('settings.searchPlaceholder')} />
 
         <div className="flex flex-1 overflow-hidden bg-[#fbfcfd]">
           <aside className="hidden w-72 shrink-0 border-r border-gray-100 bg-white p-8 lg:flex lg:flex-col">
@@ -236,18 +240,22 @@ export function SettingsPage() {
                   <div className="mt-2 text-[14px] font-bold text-[#162231]">@{user.username}</div>
                 </div>
                 <div className="rounded-2xl bg-white px-4 py-3 shadow-sm">
-                  <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">Joined</div>
-                  <div className="mt-2 text-[14px] font-bold text-[#162231]">{formatDateLabel(user.created_at)}</div>
+                  <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">{t('settings.joined')}</div>
+                  <div className="mt-2 text-[14px] font-bold text-[#162231]">
+                    {formatDateLabel(user.created_at)
+                      ? formatDate(user.created_at || '', { year: 'numeric', month: 'short', day: 'numeric' })
+                      : t('common.unavailable')}
+                  </div>
                 </div>
               </div>
             </div>
 
             <nav className="space-y-2">
               {[
-                ['profile', 'Profile'],
-                ['workspace', 'Workspace'],
-                ['notifications', 'Notifications'],
-                ['team', 'Administration'],
+                ['profile', t('settings.profile')],
+                ['workspace', t('settings.workspace')],
+                ['notifications', t('settings.notifications')],
+                ['team', t('settings.admin')],
               ].map(([id, label]) => (
                 <button
                   key={id}
@@ -271,18 +279,18 @@ export function SettingsPage() {
           <div className="flex-1 overflow-y-auto px-6 py-8 md:px-10 lg:px-12">
             <div className="mx-auto max-w-[920px] space-y-8 pb-20">
               <div>
-                <h2 className="text-[32px] font-extrabold tracking-tight text-[#162231]">Personal Settings</h2>
+                <h2 className="text-[32px] font-extrabold tracking-tight text-[#162231]">{t('settings.heading')}</h2>
                 <p className="mt-2 max-w-2xl text-[15px] font-medium leading-7 text-[#5b6b80]">
-                  Update your profile, keep your browser preferences in sync, and jump to the right place for board administration.
+                  {t('settings.headingDesc')}
                 </p>
               </div>
 
               <section id="profile" className="scroll-mt-10 rounded-[32px] border border-gray-100 bg-white p-8 shadow-sm">
                 <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <h3 className="text-[22px] font-extrabold text-[#162231]">Profile</h3>
+                    <h3 className="text-[22px] font-extrabold text-[#162231]">{t('settings.profileTitle')}</h3>
                     <p className="mt-2 text-[14px] font-medium text-[#5b6b80]">
-                      Change how you appear across boards, comments, assignments, and activity feeds.
+                      {t('settings.profileDesc')}
                     </p>
                   </div>
                   <button
@@ -291,7 +299,7 @@ export function SettingsPage() {
                     onClick={() => profileMutation.mutate()}
                     className="rounded-2xl bg-[#0f4fe6] px-5 py-3 text-sm font-bold text-white shadow-[0_14px_28px_rgba(15,79,230,0.22)] transition hover:bg-[#0c43c2] disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {profileMutation.isPending ? 'Saving...' : 'Save Profile'}
+                    {profileMutation.isPending ? t('settings.savingProfile') : t('settings.saveProfile')}
                   </button>
                 </div>
 
@@ -315,7 +323,7 @@ export function SettingsPage() {
                       className="h-44 w-full rounded-[24px] object-cover shadow-sm"
                     />
                     <div className="mt-5 text-[12px] font-extrabold uppercase tracking-[0.18em] text-[#6b7b90]">
-                      Live Preview
+                      {t('settings.livePreview')}
                     </div>
                     <div className="mt-2 text-[18px] font-extrabold text-[#162231]">
                       {profileForm.nickname.trim() || user.username}
@@ -325,7 +333,7 @@ export function SettingsPage() {
 
                   <div className="grid gap-5 md:grid-cols-2">
                     <label className="block md:col-span-2">
-                      <span className="mb-3 block text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">Display name</span>
+                      <span className="mb-3 block text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">{t('settings.displayName')}</span>
                       <input
                         type="text"
                         value={profileForm.nickname}
@@ -339,7 +347,7 @@ export function SettingsPage() {
                     </label>
 
                     <label className="block md:col-span-2">
-                      <span className="mb-3 block text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">Avatar URL</span>
+                      <span className="mb-3 block text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">{t('settings.avatarUrl')}</span>
                       <input
                         type="url"
                         value={profileForm.avatar}
@@ -354,14 +362,14 @@ export function SettingsPage() {
                     </label>
 
                     <div>
-                      <div className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">Username</div>
+                      <div className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">{t('settings.username')}</div>
                       <div className="rounded-2xl border border-gray-100 bg-[#f8fafc] px-4 py-3 text-[15px] font-bold text-[#162231]">
                         @{user.username}
                       </div>
                     </div>
 
                     <div>
-                      <div className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">Email</div>
+                      <div className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">{t('settings.email')}</div>
                       <div className="rounded-2xl border border-gray-100 bg-[#f8fafc] px-4 py-3 text-[15px] font-bold text-[#162231]">
                         {user.email}
                       </div>
@@ -373,9 +381,9 @@ export function SettingsPage() {
               <section id="workspace" className="scroll-mt-10 rounded-[32px] border border-gray-100 bg-white p-8 shadow-sm">
                 <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <h3 className="text-[22px] font-extrabold text-[#162231]">Workspace Preferences</h3>
+                    <h3 className="text-[22px] font-extrabold text-[#162231]">{t('settings.workspaceTitle')}</h3>
                     <p className="mt-2 text-[14px] font-medium text-[#5b6b80]">
-                      These preferences are stored in this browser so your board experience feels consistent on this device.
+                      {t('settings.workspaceDesc')}
                     </p>
                   </div>
                   <button
@@ -384,11 +392,11 @@ export function SettingsPage() {
                     onClick={() => {
                       localStorage.setItem(workspaceSettingsStorageKey, JSON.stringify(workspaceSettings));
                       setWorkspaceSnapshot(workspaceSettings);
-                      setWorkspaceNotice('Workspace preferences saved on this device.');
+                      setWorkspaceNotice(t('settings.workspaceSaved'));
                     }}
                     className="rounded-2xl border border-[#d9e3ef] bg-white px-5 py-3 text-sm font-bold text-[#162231] shadow-sm transition hover:border-[#bfd0e2] hover:bg-[#f8fbff] disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Save Preferences
+                    {t('settings.savePreferences')}
                   </button>
                 </div>
 
@@ -399,8 +407,14 @@ export function SettingsPage() {
                 ) : null}
 
                 <div className="grid gap-6 md:grid-cols-2">
+                  <div className="md:col-span-2 rounded-[24px] border border-[#d9e3ef] bg-[#f8fbff] px-5 py-4">
+                    <div className="mb-2 text-[15px] font-bold text-[#162231]">{t('settings.languageTitle')}</div>
+                    <div className="mb-4 text-[13px] font-medium text-[#5b6b80]">{t('settings.languageDesc')}</div>
+                    <LanguageToggle />
+                  </div>
+
                   <div>
-                    <div className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">Timezone</div>
+                    <div className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">{t('settings.timezone')}</div>
                     <SelectField
                       size="lg"
                       value={workspaceSettings.timezone}
@@ -413,7 +427,7 @@ export function SettingsPage() {
                   </div>
 
                   <div>
-                    <div className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">Week starts on</div>
+                    <div className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">{t('settings.weekStartsOn')}</div>
                     <SelectField
                       size="lg"
                       value={workspaceSettings.weekStartsOn}
@@ -426,7 +440,7 @@ export function SettingsPage() {
                   </div>
 
                   <div>
-                    <div className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">Content density</div>
+                    <div className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">{t('settings.contentDensity')}</div>
                     <SelectField
                       size="lg"
                       value={workspaceSettings.density}
@@ -441,8 +455,8 @@ export function SettingsPage() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between rounded-[24px] border border-[#d9e3ef] bg-[#f8fbff] px-5 py-4">
                       <div>
-                        <div className="text-[15px] font-bold text-[#162231]">Compact cards</div>
-                        <div className="mt-1 text-[13px] font-medium text-[#5b6b80]">Reduce vertical spacing in board lanes.</div>
+                        <div className="text-[15px] font-bold text-[#162231]">{t('settings.compactCards')}</div>
+                        <div className="mt-1 text-[13px] font-medium text-[#5b6b80]">{t('settings.compactCardsDesc')}</div>
                       </div>
                       <Toggle
                         checked={workspaceSettings.compactCards}
@@ -455,8 +469,8 @@ export function SettingsPage() {
 
                     <div className="flex items-center justify-between rounded-[24px] border border-[#d9e3ef] bg-[#f8fbff] px-5 py-4">
                       <div>
-                        <div className="text-[15px] font-bold text-[#162231]">Sticky board filters</div>
-                        <div className="mt-1 text-[13px] font-medium text-[#5b6b80]">Keep your last board filters remembered locally.</div>
+                        <div className="text-[15px] font-bold text-[#162231]">{t('settings.stickyFilters')}</div>
+                        <div className="mt-1 text-[13px] font-medium text-[#5b6b80]">{t('settings.stickyFiltersDesc')}</div>
                       </div>
                       <Toggle
                         checked={workspaceSettings.stickBoardFilters}
@@ -473,9 +487,9 @@ export function SettingsPage() {
               <section id="notifications" className="scroll-mt-10 rounded-[32px] border border-gray-100 bg-white p-8 shadow-sm">
                 <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <h3 className="text-[22px] font-extrabold text-[#162231]">Notifications</h3>
+                    <h3 className="text-[22px] font-extrabold text-[#162231]">{t('settings.notificationsTitle')}</h3>
                     <p className="mt-2 text-[14px] font-medium text-[#5b6b80]">
-                      Tune reminder defaults for this browser so you can stay focused without losing important updates.
+                      {t('settings.notificationsDesc')}
                     </p>
                   </div>
                   <button
@@ -484,11 +498,11 @@ export function SettingsPage() {
                     onClick={() => {
                       localStorage.setItem(notificationSettingsStorageKey, JSON.stringify(notificationSettings));
                       setNotificationSnapshot(notificationSettings);
-                      setNotificationNotice('Notification preferences saved on this device.');
+                      setNotificationNotice(t('settings.notificationsSaved'));
                     }}
                     className="rounded-2xl border border-[#d9e3ef] bg-white px-5 py-3 text-sm font-bold text-[#162231] shadow-sm transition hover:border-[#bfd0e2] hover:bg-[#f8fbff] disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Save Notifications
+                    {t('settings.saveNotifications')}
                   </button>
                 </div>
 
@@ -502,23 +516,23 @@ export function SettingsPage() {
                   {[
                     {
                       key: 'cardAssignedEmail',
-                      title: 'Email when a card is assigned to me',
-                      description: 'Useful when teammates hand work over and you are not already looking at the board.',
+                      title: t('settings.cardAssignedEmail'),
+                      description: t('settings.cardAssignedEmailDesc'),
                     },
                     {
                       key: 'dueSoonDesktop',
-                      title: 'Desktop reminder for cards due soon',
-                      description: 'Surface upcoming due dates before they turn urgent.',
+                      title: t('settings.dueSoonDesktop'),
+                      description: t('settings.dueSoonDesktopDesc'),
                     },
                     {
                       key: 'commentMentionEmail',
-                      title: 'Email when I am mentioned in a comment',
-                      description: 'Catch feedback and unblock conversations faster.',
+                      title: t('settings.commentMentionEmail'),
+                      description: t('settings.commentMentionEmailDesc'),
                     },
                     {
                       key: 'weeklyDigest',
-                      title: 'Weekly delivery digest',
-                      description: 'Summarize your board momentum once per week on this device.',
+                      title: t('settings.weeklyDigest'),
+                      description: t('settings.weeklyDigestDesc'),
                     },
                   ].map((item) => (
                     <div
@@ -546,9 +560,9 @@ export function SettingsPage() {
 
               <section id="team" className="scroll-mt-10 rounded-[32px] border border-gray-100 bg-white p-8 shadow-sm">
                 <div className="mb-8">
-                  <h3 className="text-[22px] font-extrabold text-[#162231]">Administration</h3>
+                  <h3 className="text-[22px] font-extrabold text-[#162231]">{t('settings.adminTitle')}</h3>
                   <p className="mt-2 text-[14px] font-medium text-[#5b6b80]">
-                    Workspace-wide team management is still evolving. Today, the most important admin actions live directly inside each board.
+                    {t('settings.adminDesc')}
                   </p>
                 </div>
 
@@ -557,10 +571,10 @@ export function SettingsPage() {
                     to="/boards"
                     className="rounded-[24px] border border-[#d9e3ef] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4fa_100%)] p-5 shadow-sm transition hover:-translate-y-0.5"
                   >
-                    <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">Boards</div>
-                    <div className="mt-3 text-[18px] font-extrabold text-[#162231]">Open Board Settings</div>
+                    <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">{t('settings.boards')}</div>
+                    <div className="mt-3 text-[18px] font-extrabold text-[#162231]">{t('settings.openBoardSettings')}</div>
                     <div className="mt-2 text-[13px] font-medium leading-6 text-[#5b6b80]">
-                      Manage members, lists, swimlanes, labels, webhooks, and automation rules where the work happens.
+                      {t('settings.openBoardSettingsDesc')}
                     </div>
                   </Link>
 
@@ -568,10 +582,10 @@ export function SettingsPage() {
                     to="/projects"
                     className="rounded-[24px] border border-[#d9e3ef] bg-[linear-gradient(180deg,#fffdf8_0%,#f7f2e8_100%)] p-5 shadow-sm transition hover:-translate-y-0.5"
                   >
-                    <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#7d6642]">Projects</div>
-                    <div className="mt-3 text-[18px] font-extrabold text-[#162231]">Review Project Health</div>
+                    <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#7d6642]">{t('settings.projects')}</div>
+                    <div className="mt-3 text-[18px] font-extrabold text-[#162231]">{t('settings.reviewProjectHealth')}</div>
                     <div className="mt-2 text-[13px] font-medium leading-6 text-[#5b6b80]">
-                      Track scope, schedule, and status changes across delivery workstreams.
+                      {t('settings.reviewProjectHealthDesc')}
                     </div>
                   </Link>
 
@@ -579,16 +593,16 @@ export function SettingsPage() {
                     to="/analytics"
                     className="rounded-[24px] border border-[#d9e3ef] bg-[linear-gradient(180deg,#f8fffb_0%,#edf7f1_100%)] p-5 shadow-sm transition hover:-translate-y-0.5"
                   >
-                    <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#2e6d57]">Analytics</div>
-                    <div className="mt-3 text-[18px] font-extrabold text-[#162231]">Inspect Flow Metrics</div>
+                    <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#2e6d57]">{t('settings.analytics')}</div>
+                    <div className="mt-3 text-[18px] font-extrabold text-[#162231]">{t('settings.inspectFlowMetrics')}</div>
                     <div className="mt-2 text-[13px] font-medium leading-6 text-[#5b6b80]">
-                      Use cycle time, throughput, and CFD trends to spot blockers and rebalance the system.
+                      {t('settings.inspectFlowMetricsDesc')}
                     </div>
                   </Link>
                 </div>
 
                 <div className="mt-6 rounded-[24px] border border-dashed border-[#d9e3ef] bg-[#f8fbff] px-5 py-4 text-[14px] font-medium leading-7 text-[#5b6b80]">
-                  Need to adjust board permissions right now? Open a board, click <span className="font-extrabold text-[#162231]">Settings</span>, then use the members and automations sections there.
+                  {t('settings.permissionsHelp')}
                 </div>
               </section>
             </div>

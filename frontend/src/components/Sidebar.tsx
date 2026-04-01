@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useI18n } from '@/context/I18nContext';
 import { resolveAssetUrl } from '@/services/api';
 
 // Icons
@@ -13,6 +14,7 @@ export const LogoutIcon = () => <svg className="w-4 h-4" fill="none" viewBox="0 
 
 export function Sidebar({ activePage }: { activePage: string }) {
   const { logout, user } = useAuth();
+  const { t } = useI18n();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -21,16 +23,16 @@ export function Sidebar({ activePage }: { activePage: string }) {
   };
 
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', path: '/', icon: <DashboardIcon /> },
-    { id: 'projects', label: 'Projects', path: '/projects', icon: <FolderIcon /> },
-    { id: 'boards', label: 'Active Boards', path: '/boards', icon: <LayoutIcon /> },
-    { id: 'analytics', label: 'Analytics', path: '/analytics', icon: <ChartBarIcon /> },
-    { id: 'team', label: 'Team', path: '/team', icon: <UsersIcon /> },
-    { id: 'settings', label: 'Settings', path: '/settings', icon: <CogIcon /> },
+    { id: 'dashboard', label: t('sidebar.dashboard'), path: '/', icon: <DashboardIcon /> },
+    { id: 'projects', label: t('sidebar.projects'), path: '/projects', icon: <FolderIcon /> },
+    { id: 'boards', label: t('sidebar.activeBoards'), path: '/boards', icon: <LayoutIcon /> },
+    { id: 'analytics', label: t('sidebar.analytics'), path: '/analytics', icon: <ChartBarIcon /> },
+    { id: 'team', label: t('sidebar.team'), path: '/team', icon: <UsersIcon /> },
+    { id: 'settings', label: t('sidebar.settings'), path: '/settings', icon: <CogIcon /> },
   ];
 
   const displayName = user?.nickname || user?.username || 'Alex Chen';
-  const displayRole = user?.email || 'Team Lead';
+  const displayRole = user?.email || t('sidebar.defaultRole');
   const avatarUrl = resolveAssetUrl(user?.avatar) || 'https://i.pravatar.cc/150?img=11';
 
   return (
@@ -38,7 +40,7 @@ export function Sidebar({ activePage }: { activePage: string }) {
       <div className="flex-1 px-6 pt-8">
         <div className="px-4 pb-12">
           <h2 className="text-[22px] font-extrabold leading-none tracking-tight text-[#111827]">Kinetic</h2>
-          <p className="mt-2 text-[10px] font-extrabold uppercase tracking-[0.22em] text-[#64748b]">Workspace</p>
+          <p className="mt-2 text-[10px] font-extrabold uppercase tracking-[0.22em] text-[#64748b]">{t('sidebar.workspace')}</p>
         </div>
 
         <nav className="flex flex-col gap-1.5">
@@ -85,7 +87,7 @@ export function Sidebar({ activePage }: { activePage: string }) {
             onClick={handleLogout}
             className="flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[13px] font-bold text-[#6b7b90] transition-colors hover:bg-red-50 hover:text-red-500"
           >
-            <LogoutIcon /> Logout
+            <LogoutIcon /> {t('sidebar.logout')}
           </button>
         </div>
       </div>

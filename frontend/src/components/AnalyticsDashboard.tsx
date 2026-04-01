@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useI18n } from '@/context/I18nContext';
 import { boardApi } from '@/services/api';
 import { DatePickerField } from '@/components/DatePickerField';
 import type { CFDDataPoint, CFDResponse, CycleTimeResponse, ThroughputResponse } from '@/types';
@@ -9,6 +10,7 @@ interface AnalyticsDashboardProps {
 }
 
 export function AnalyticsDashboard({ boardId }: AnalyticsDashboardProps) {
+  const { t } = useI18n();
   const [dateRange, setDateRange] = useState({
     start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     end_date: new Date().toISOString().split('T')[0],
@@ -89,7 +91,7 @@ export function AnalyticsDashboard({ boardId }: AnalyticsDashboardProps) {
       {/* Date Range */}
       <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
         <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-600">开始日期:</label>
+          <label className="text-sm text-gray-600">{t('analyticsDashboard.startDate')}</label>
           <DatePickerField
             value={dateRange.start_date}
             onChange={(nextValue) => setDateRange({ ...dateRange, start_date: nextValue })}
@@ -97,7 +99,7 @@ export function AnalyticsDashboard({ boardId }: AnalyticsDashboardProps) {
           />
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-600">结束日期:</label>
+          <label className="text-sm text-gray-600">{t('analyticsDashboard.endDate')}</label>
           <DatePickerField
             value={dateRange.end_date}
             onChange={(nextValue) => setDateRange({ ...dateRange, end_date: nextValue })}
@@ -109,33 +111,33 @@ export function AnalyticsDashboard({ boardId }: AnalyticsDashboardProps) {
       {/* Stats Cards */}
       <div className="grid grid-cols-3 gap-4">
         <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg text-white">
-          <div className="text-sm opacity-80">已完成卡片</div>
+          <div className="text-sm opacity-80">{t('analyticsDashboard.completedCards')}</div>
           <div className="text-3xl font-bold mt-1">{throughput?.total_completed || 0}</div>
-          <div className="text-sm opacity-80 mt-1">日均: {throughput?.daily_average?.toFixed(1) || 0}</div>
+          <div className="text-sm opacity-80 mt-1">{t('analyticsDashboard.dailyAverage', { value: throughput?.daily_average?.toFixed(1) || 0 })}</div>
         </div>
         <div className="p-4 bg-gradient-to-br from-green-500 to-green-600 rounded-lg text-white">
-          <div className="text-sm opacity-80">平均周期时间</div>
+          <div className="text-sm opacity-80">{t('analyticsDashboard.avgCycleTime')}</div>
           <div className="text-3xl font-bold mt-1">
             {cycleTime?.average_cycle_time ? (cycleTime.average_cycle_time / 24).toFixed(1) : 0}
           </div>
-          <div className="text-sm opacity-80 mt-1">天</div>
+          <div className="text-sm opacity-80 mt-1">{t('analyticsDashboard.days')}</div>
         </div>
         <div className="p-4 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg text-white">
-          <div className="text-sm opacity-80">平均前置时间</div>
+          <div className="text-sm opacity-80">{t('analyticsDashboard.avgLeadTime')}</div>
           <div className="text-3xl font-bold mt-1">
             {cycleTime?.average_lead_time ? (cycleTime.average_lead_time / 24).toFixed(1) : 0}
           </div>
-          <div className="text-sm opacity-80 mt-1">天</div>
+          <div className="text-sm opacity-80 mt-1">{t('analyticsDashboard.days')}</div>
         </div>
       </div>
 
       {/* CFD Chart */}
       <div className="p-4 bg-white border rounded-lg">
-        <h3 className="text-lg font-medium mb-4">累积流图 (CFD)</h3>
+        <h3 className="text-lg font-medium mb-4">{t('analyticsDashboard.cfd')}</h3>
         {cfdLoading ? (
-          <div className="h-64 flex items-center justify-center text-gray-500">加载中...</div>
+          <div className="h-64 flex items-center justify-center text-gray-500">{t('analyticsDashboard.loading')}</div>
         ) : !cfd?.data || cfd.data.length === 0 ? (
-          <div className="h-64 flex items-center justify-center text-gray-500">暂无数据</div>
+          <div className="h-64 flex items-center justify-center text-gray-500">{t('analyticsDashboard.empty')}</div>
         ) : (
           <div className="relative">
             <svg width="100%" viewBox="0 0 700 250" className="overflow-visible">
@@ -166,18 +168,21 @@ export function AnalyticsDashboard({ boardId }: AnalyticsDashboardProps) {
 
       {/* Cycle Time Details */}
       <div className="p-4 bg-white border rounded-lg">
-        <h3 className="text-lg font-medium mb-4">周期时间分布</h3>
+        <h3 className="text-lg font-medium mb-4">{t('analyticsDashboard.cycleDistribution')}</h3>
         {cycleTimeLoading ? (
-          <div className="h-48 flex items-center justify-center text-gray-500">加载中...</div>
+          <div className="h-48 flex items-center justify-center text-gray-500">{t('analyticsDashboard.loading')}</div>
         ) : !cycleTime?.cards || cycleTime.cards.length === 0 ? (
-          <div className="h-48 flex items-center justify-center text-gray-500">暂无数据</div>
+          <div className="h-48 flex items-center justify-center text-gray-500">{t('analyticsDashboard.empty')}</div>
         ) : (
           <div className="space-y-2 max-h-48 overflow-y-auto">
             {cycleTime.cards.slice(0, 10).map((card, index) => (
               <div key={card.card_id || index} className="flex items-center justify-between py-2 border-b">
                 <span className="text-sm font-medium">{card.card_title}</span>
                 <div className="text-sm text-gray-500">
-                  周期: {((card.cycle_time || 0) / 24).toFixed(1)}天 | 前置: {((card.lead_time || 0) / 24).toFixed(1)}天
+                  {t('analyticsDashboard.cycleLead', {
+                    cycle: ((card.cycle_time || 0) / 24).toFixed(1),
+                    lead: ((card.lead_time || 0) / 24).toFixed(1),
+                  })}
                 </div>
               </div>
             ))}
@@ -187,11 +192,11 @@ export function AnalyticsDashboard({ boardId }: AnalyticsDashboardProps) {
 
       {/* Throughput Chart */}
       <div className="p-4 bg-white border rounded-lg">
-        <h3 className="text-lg font-medium mb-4">吞吐率 (每周完成)</h3>
+        <h3 className="text-lg font-medium mb-4">{t('analyticsDashboard.throughput')}</h3>
         {throughputLoading ? (
-          <div className="h-48 flex items-center justify-center text-gray-500">加载中...</div>
+          <div className="h-48 flex items-center justify-center text-gray-500">{t('analyticsDashboard.loading')}</div>
         ) : !throughput?.weekly_data || throughput.weekly_data.length === 0 ? (
-          <div className="h-48 flex items-center justify-center text-gray-500">暂无数据</div>
+          <div className="h-48 flex items-center justify-center text-gray-500">{t('analyticsDashboard.empty')}</div>
         ) : (
           <div className="space-y-2">
             {throughput.weekly_data.map((week, index) => (

@@ -7,35 +7,13 @@ import { SelectField } from '@/components/SelectField';
 import { DatePickerField } from '@/components/DatePickerField';
 import { projectApi, resolveAssetUrl } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
-
-const templates = [
-  {
-    id: 'launch',
-    name: 'Product Launch',
-    description: 'Milestones, campaign assets, approval flow, and launch checklist.',
-    accent: 'bg-[#dfe7ff] text-[#0f4fe6]',
-    color: '#0f4fe6',
-  },
-  {
-    id: 'delivery',
-    name: 'Client Delivery',
-    description: 'Scope tracking, feedback loops, QA, and release handoff.',
-    accent: 'bg-[#ffe7d2] text-[#b45309]',
-    color: '#f97316',
-  },
-  {
-    id: 'blank',
-    name: 'Blank Workspace',
-    description: 'Start from scratch and build lists, boards, and workflows your way.',
-    accent: 'bg-[#dde7f0] text-[#4e5f74]',
-    color: '#64748b',
-  },
-];
+import { useI18n } from '@/context/I18nContext';
 
 export function CreateProjectPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { t } = useI18n();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -44,24 +22,50 @@ export function CreateProjectPage() {
   const [priority, setPriority] = useState('high');
   const [templateId, setTemplateId] = useState('launch');
   const [error, setError] = useState('');
+  const templates = useMemo(
+    () => [
+      {
+        id: 'launch',
+        name: t('createProject.template.launch'),
+        description: t('createProject.template.launchDesc'),
+        accent: 'bg-[#dfe7ff] text-[#0f4fe6]',
+        color: '#0f4fe6',
+      },
+      {
+        id: 'delivery',
+        name: t('createProject.template.delivery'),
+        description: t('createProject.template.deliveryDesc'),
+        accent: 'bg-[#ffe7d2] text-[#b45309]',
+        color: '#f97316',
+      },
+      {
+        id: 'blank',
+        name: t('createProject.template.blank'),
+        description: t('createProject.template.blankDesc'),
+        accent: 'bg-[#dde7f0] text-[#4e5f74]',
+        color: '#64748b',
+      },
+    ],
+    [t]
+  );
 
   const selectedTemplate = templates.find((template) => template.id === templateId) || templates[0];
-  const ownerName = user?.nickname || user?.username || 'Current User';
+  const ownerName = user?.nickname || user?.username || t('common.owner');
   const ownerEmail = user?.email || 'workspace@kinetic.io';
   const ownerAvatar = resolveAssetUrl(user?.avatar) || `https://i.pravatar.cc/160?u=${user?.id || 'owner'}`;
   const setupChecklist = useMemo(
     () => [
-      { label: 'Add a project name', completed: !!title.trim() },
-      { label: 'Write a short description', completed: !!description.trim() },
-      { label: 'Set a target delivery window', completed: !!startDate && !!targetDate },
-      { label: 'Choose the operating status and priority', completed: !!status && !!priority },
-      { label: 'Pick the visual template', completed: !!templateId },
+      { label: t('createProject.check.name'), completed: !!title.trim() },
+      { label: t('createProject.check.description'), completed: !!description.trim() },
+      { label: t('createProject.check.window'), completed: !!startDate && !!targetDate },
+      { label: t('createProject.check.meta'), completed: !!status && !!priority },
+      { label: t('createProject.check.template'), completed: !!templateId },
     ],
-    [description, priority, startDate, status, targetDate, templateId, title]
+    [description, priority, startDate, status, targetDate, templateId, title, t]
   );
   const completedChecklistCount = setupChecklist.filter((item) => item.completed).length;
-  const statusLabel = status.replace('-', ' ');
-  const priorityLabel = priority;
+  const statusLabel = t(`boardList.status.${status}`);
+  const priorityLabel = t(`boardList.priority.${priority}`);
 
   const createProjectMutation = useMutation({
     mutationFn: () =>
@@ -79,13 +83,13 @@ export function CreateProjectPage() {
       navigate(`/projects/${response.data.id}`);
     },
     onError: (mutationError: any) => {
-      setError(mutationError.response?.data?.error || 'Failed to create project');
+      setError(mutationError.response?.data?.error || t('createProject.errorFailed'));
     },
   });
 
   const handleSubmit = () => {
     if (!title.trim()) {
-      setError('Project name is required');
+      setError(t('createProject.errorNameRequired'));
       return;
     }
 
@@ -98,23 +102,23 @@ export function CreateProjectPage() {
       <Sidebar activePage="projects" />
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f7fbff]">
-        <TopNav title="" searchPlaceholder="Search templates..." />
+        <TopNav title="" searchPlaceholder={t('createProject.searchPlaceholder')} />
 
         <div className="flex-1 overflow-auto px-10 pb-10 pt-8">
           <div className="mx-auto max-w-[1240px]">
             <div className="mb-8 flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
               <div>
                 <div className="mb-4 flex items-center gap-2 text-[12px] font-extrabold uppercase tracking-[0.18em] text-[#6b7b90]">
-                  <Link to="/projects" className="transition hover:text-[#0f4fe6]">Projects</Link>
+                  <Link to="/projects" className="transition hover:text-[#0f4fe6]">{t('createProject.breadcrumbProjects')}</Link>
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.8} d="M9 5l7 7-7 7" />
                   </svg>
-                  <span className="text-[#162231]">Create Project</span>
+                  <span className="text-[#162231]">{t('createProject.breadcrumbCreate')}</span>
                 </div>
 
-                <h1 className="text-[38px] font-extrabold tracking-tight text-[#162231]">Create a New Project</h1>
+                <h1 className="text-[38px] font-extrabold tracking-tight text-[#162231]">{t('createProject.title')}</h1>
                 <p className="mt-2 max-w-2xl text-[17px] font-medium text-[#5b6b80]">
-                  Create the parent project first, then add boards and workflows under it.
+                  {t('createProject.desc')}
                 </p>
               </div>
 
@@ -123,7 +127,7 @@ export function CreateProjectPage() {
                   to="/projects"
                   className="flex h-14 items-center gap-3 rounded-2xl border border-[#d9e3ef] bg-white px-6 text-[16px] font-semibold text-[#162231] shadow-[0_8px_24px_rgba(17,24,39,0.05)]"
                 >
-                  Cancel
+                  {t('createProject.cancel')}
                 </Link>
                 <button
                   onClick={handleSubmit}
@@ -133,7 +137,7 @@ export function CreateProjectPage() {
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.4} d="M12 4v16m8-8H4" />
                   </svg>
-                  {createProjectMutation.isPending ? 'Creating...' : 'Create Project'}
+                  {createProjectMutation.isPending ? t('createProject.creating') : t('createProject.create')}
                 </button>
               </div>
             </div>
@@ -149,15 +153,15 @@ export function CreateProjectPage() {
                 <section className="rounded-[34px] bg-[#eef4fa] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
                   <div className="mb-8 flex items-center justify-between">
                     <div>
-                      <h2 className="text-[20px] font-extrabold text-[#162231]">Project Details</h2>
-                      <p className="mt-2 text-[14px] font-medium text-[#5b6b80]">Core project information saved to the API.</p>
+                      <h2 className="text-[20px] font-extrabold text-[#162231]">{t('createProject.detailsTitle')}</h2>
+                      <p className="mt-2 text-[14px] font-medium text-[#5b6b80]">{t('createProject.detailsDesc')}</p>
                     </div>
-                    <span className="rounded-full bg-[#dfe7ff] px-3 py-1 text-[12px] font-extrabold text-[#0f4fe6]">STEP 1</span>
+                    <span className="rounded-full bg-[#dfe7ff] px-3 py-1 text-[12px] font-extrabold text-[#0f4fe6]">{t('createProject.step1')}</span>
                   </div>
 
                   <div className="grid gap-6 md:grid-cols-2">
                     <label className="block">
-                      <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Project Name</span>
+                      <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">{t('createProject.projectName')}</span>
                       <input
                         type="text"
                         value={title}
@@ -167,28 +171,28 @@ export function CreateProjectPage() {
                     </label>
 
                     <div className="block">
-                      <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Project Owner</span>
+                      <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">{t('createProject.projectOwner')}</span>
                       <div className="flex h-14 items-center justify-between rounded-2xl border border-[#d9e3ef] bg-white px-5 shadow-[0_8px_24px_rgba(17,24,39,0.04)]">
                         <div>
                           <div className="text-[15px] font-semibold text-[#162231]">{ownerName}</div>
                           <div className="text-[12px] font-medium text-[#6b7b90]">{ownerEmail}</div>
                         </div>
-                        <span className="rounded-full bg-[#eef4fa] px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#4e5f74]">Owner</span>
+                        <span className="rounded-full bg-[#eef4fa] px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#4e5f74]">{t('common.owner')}</span>
                       </div>
                     </div>
 
                     <label className="block">
-                      <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Start Date</span>
+                      <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">{t('createProject.startDate')}</span>
                       <DatePickerField value={startDate} onChange={setStartDate} size="lg" />
                     </label>
 
                     <label className="block">
-                      <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Target Delivery</span>
+                      <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">{t('createProject.targetDelivery')}</span>
                       <DatePickerField value={targetDate} onChange={setTargetDate} size="lg" />
                     </label>
 
                     <label className="block md:col-span-2">
-                      <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Description</span>
+                      <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">{t('createProject.description')}</span>
                       <textarea
                         rows={5}
                         value={description}
@@ -202,10 +206,10 @@ export function CreateProjectPage() {
                 <section className="rounded-[34px] bg-white p-8 shadow-[0_16px_34px_rgba(16,24,40,0.06)]">
                   <div className="mb-8 flex items-center justify-between">
                     <div>
-                      <h2 className="text-[20px] font-extrabold text-[#162231]">Choose a Template</h2>
-                      <p className="mt-2 text-[14px] font-medium text-[#5b6b80]">Templates currently affect the initial project color and visual mood.</p>
+                      <h2 className="text-[20px] font-extrabold text-[#162231]">{t('createProject.templateTitle')}</h2>
+                      <p className="mt-2 text-[14px] font-medium text-[#5b6b80]">{t('createProject.templateDesc')}</p>
                     </div>
-                    <span className="rounded-full bg-[#eef4fa] px-3 py-1 text-[12px] font-extrabold text-[#4e5f74]">STEP 2</span>
+                    <span className="rounded-full bg-[#eef4fa] px-3 py-1 text-[12px] font-extrabold text-[#4e5f74]">{t('createProject.step2')}</span>
                   </div>
 
                   <div className="grid gap-5 lg:grid-cols-3">
@@ -223,7 +227,7 @@ export function CreateProjectPage() {
                           }`}
                         >
                           <div className={`inline-flex rounded-xl px-3 py-1.5 text-[12px] font-extrabold ${template.accent}`}>
-                            TEMPLATE
+                            {t('createProject.template')}
                           </div>
                           <h3 className="mt-5 text-[20px] font-extrabold text-[#162231]">{template.name}</h3>
                           <p className="mt-3 text-[14px] font-medium leading-7 text-[#5b6b80]">{template.description}</p>
@@ -236,10 +240,10 @@ export function CreateProjectPage() {
                 <section className="rounded-[34px] bg-[#eef4fa] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]">
                   <div className="mb-8 flex items-center justify-between">
                     <div>
-                      <h2 className="text-[20px] font-extrabold text-[#162231]">Planning Metadata</h2>
-                      <p className="mt-2 text-[14px] font-medium text-[#5b6b80]">These fields are stored on the project and drive list/detail views.</p>
+                      <h2 className="text-[20px] font-extrabold text-[#162231]">{t('createProject.metadataTitle')}</h2>
+                      <p className="mt-2 text-[14px] font-medium text-[#5b6b80]">{t('createProject.metadataDesc')}</p>
                     </div>
-                    <span className="rounded-full bg-white px-3 py-1 text-[12px] font-extrabold text-[#4e5f74]">STEP 3</span>
+                    <span className="rounded-full bg-white px-3 py-1 text-[12px] font-extrabold text-[#4e5f74]">{t('createProject.step3')}</span>
                   </div>
 
                   <div className="mb-8 grid gap-4 md:grid-cols-3">
@@ -248,51 +252,51 @@ export function CreateProjectPage() {
                         <img src={ownerAvatar} alt={ownerName} className="h-14 w-14 rounded-2xl object-cover" />
                         <div>
                           <h3 className="text-[17px] font-extrabold text-[#162231]">{ownerName}</h3>
-                          <p className="mt-1 text-[13px] font-medium text-[#5b6b80]">Project owner</p>
+                          <p className="mt-1 text-[13px] font-medium text-[#5b6b80]">{t('createProject.projectOwnerLabel')}</p>
                         </div>
                       </div>
                     </div>
 
                     <div className="rounded-[26px] bg-white p-5 shadow-sm">
-                      <div className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-[#4e5f74]">Status</div>
+                      <div className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-[#4e5f74]">{t('createProject.status')}</div>
                       <div className="mt-4 text-[22px] font-extrabold capitalize tracking-tight text-[#162231]">{statusLabel}</div>
-                      <div className="mt-2 text-[13px] font-medium text-[#5b6b80]">Sets how this project appears across overview pages.</div>
+                      <div className="mt-2 text-[13px] font-medium text-[#5b6b80]">{t('createProject.statusDesc')}</div>
                     </div>
 
                     <div className="rounded-[26px] bg-white p-5 shadow-sm">
-                      <div className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-[#4e5f74]">Priority</div>
+                      <div className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-[#4e5f74]">{t('createProject.priority')}</div>
                       <div className="mt-4 text-[22px] font-extrabold capitalize tracking-tight text-[#162231]">{priorityLabel}</div>
-                      <div className="mt-2 text-[13px] font-medium text-[#5b6b80]">Helps the portfolio view sort urgency once the project ships.</div>
+                      <div className="mt-2 text-[13px] font-medium text-[#5b6b80]">{t('createProject.priorityDesc')}</div>
                     </div>
                   </div>
 
                   <div className="grid gap-6 md:grid-cols-2">
                     <label className="block">
-                      <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Project Status</span>
+                      <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">{t('createProject.projectStatus')}</span>
                       <SelectField
                         size="lg"
                         value={status}
                         onChange={setStatus}
                         options={[
-                          { value: 'planning', label: 'Planning' },
-                          { value: 'active', label: 'Active' },
-                          { value: 'on-hold', label: 'On Hold' },
-                          { value: 'completed', label: 'Completed' },
+                          { value: 'planning', label: t('boardList.status.planning') },
+                          { value: 'active', label: t('boardList.status.active') },
+                          { value: 'on-hold', label: t('boardList.status.on-hold') },
+                          { value: 'completed', label: t('boardList.status.completed') },
                         ]}
                       />
                     </label>
 
                     <label className="block">
-                      <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Priority</span>
+                      <span className="mb-3 block text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">{t('createProject.priority')}</span>
                       <SelectField
                         size="lg"
                         value={priority}
                         onChange={setPriority}
                         options={[
-                          { value: 'low', label: 'Low' },
-                          { value: 'medium', label: 'Medium' },
-                          { value: 'high', label: 'High' },
-                          { value: 'urgent', label: 'Urgent' },
+                          { value: 'low', label: t('boardList.priority.low') },
+                          { value: 'medium', label: t('boardList.priority.medium') },
+                          { value: 'high', label: t('boardList.priority.high') },
+                          { value: 'urgent', label: t('boardList.priority.urgent') },
                         ]}
                       />
                     </label>
@@ -302,31 +306,31 @@ export function CreateProjectPage() {
 
               <aside className="space-y-8">
                 <section className="rounded-[34px] bg-white p-8 shadow-[0_16px_34px_rgba(16,24,40,0.06)]">
-                  <h2 className="text-[20px] font-extrabold text-[#162231]">Project Brief</h2>
+                  <h2 className="text-[20px] font-extrabold text-[#162231]">{t('createProject.briefTitle')}</h2>
                   <p className="mt-3 text-[14px] font-medium leading-7 text-[#5b6b80]">
-                    The project is the parent container. Boards will be added under it after creation.
+                    {t('createProject.briefDesc')}
                   </p>
 
                   <div className="mt-8 space-y-5">
                     <div className="rounded-[24px] bg-[#eef4fa] p-5">
-                      <p className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">Selected Template</p>
+                      <p className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-[#4e5f74]">{t('createProject.selectedTemplate')}</p>
                       <p className="mt-3 text-[28px] font-extrabold tracking-tight text-[#162231]">{selectedTemplate.name}</p>
                     </div>
 
                     <div className="rounded-[24px] bg-[#fff5ec] p-5">
-                      <p className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-[#b45309]">Timeline</p>
+                      <p className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-[#b45309]">{t('createProject.timeline')}</p>
                       <p className="mt-3 text-[20px] font-extrabold tracking-tight text-[#162231]">
-                        {startDate || 'Not set'} to {targetDate || 'Not set'}
+                        {(startDate || t('common.notSet'))} {t('createProject.to')} {(targetDate || t('common.notSet'))}
                       </p>
                     </div>
 
                     <div className="rounded-[24px] bg-[#eef8f2] p-5">
-                      <p className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-[#027a48]">Readiness</p>
+                      <p className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-[#027a48]">{t('createProject.setupChecklist')}</p>
                       <p className="mt-3 text-[28px] font-extrabold tracking-tight text-[#162231]">
                         {completedChecklistCount}/{setupChecklist.length}
                       </p>
                       <p className="mt-2 text-[13px] font-medium leading-6 text-[#4b6353]">
-                        Core fields completed before creating the project.
+                        {t('createProject.checklistProgress', { done: completedChecklistCount, total: setupChecklist.length })}
                       </p>
                     </div>
                   </div>
@@ -334,9 +338,9 @@ export function CreateProjectPage() {
 
                 <section className="rounded-[34px] bg-[#eef4fa] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]">
                   <div className="mb-6 flex items-center justify-between">
-                    <h2 className="text-[20px] font-extrabold text-[#162231]">Launch Checklist</h2>
+                    <h2 className="text-[20px] font-extrabold text-[#162231]">{t('createProject.setupChecklist')}</h2>
                     <span className="rounded-full bg-white px-3 py-1 text-[12px] font-extrabold text-[#4e5f74]">
-                      {completedChecklistCount}/{setupChecklist.length} READY
+                      {t('createProject.checklistProgress', { done: completedChecklistCount, total: setupChecklist.length })}
                     </span>
                   </div>
 
@@ -355,7 +359,7 @@ export function CreateProjectPage() {
                         <div>
                           <p className="text-[14px] font-semibold leading-6 text-[#223042]">{item.label}</p>
                           <p className="mt-1 text-[12px] font-medium text-[#6b7b90]">
-                            {item.completed ? 'Ready' : 'Still missing'}
+                            {item.completed ? t('createProject.ready') : t('createProject.missing')}
                           </p>
                         </div>
                       </div>

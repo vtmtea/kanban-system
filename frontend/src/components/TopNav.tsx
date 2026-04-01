@@ -1,5 +1,7 @@
 import { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { LanguageToggle } from '@/components/LanguageToggle';
+import { useI18n } from '@/context/I18nContext';
 
 // Icons
 export const BellIcon = () => <svg className="w-[20px] h-[20px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>;
@@ -9,12 +11,15 @@ export const SettingCogIcon = () => <svg className="w-[20px] h-[20px]" fill="non
 export function TopNav({
   title,
   CustomCenter,
-  searchPlaceholder = 'Search insights...',
+  searchPlaceholder,
 }: {
   title: string;
   CustomCenter?: ReactNode;
   searchPlaceholder?: string;
 }) {
+  const { t } = useI18n();
+  const resolvedSearchPlaceholder = searchPlaceholder || t('common.searchInsights');
+
   return (
     <header className="flex h-[96px] w-full shrink-0 items-center border-b border-[#e6edf5] bg-[#f7fbff] px-8 md:px-10">
       <div className="min-w-0 flex-1">
@@ -29,7 +34,7 @@ export function TopNav({
             </svg>
             <input
               type="text"
-              placeholder={searchPlaceholder}
+              placeholder={resolvedSearchPlaceholder}
               className="h-11 w-full rounded-2xl border border-transparent bg-[#eaf1f8] pl-14 pr-4 text-[14px] font-medium text-[#314155] placeholder:text-[#74859c] outline-none transition focus:border-[#c9d7e6] focus:bg-white"
             />
           </label>
@@ -37,13 +42,26 @@ export function TopNav({
       </div>
 
       <div className="flex flex-1 items-center justify-end gap-3">
-        <button className="flex h-10 w-10 items-center justify-center rounded-2xl text-[#687a92] transition hover:bg-white hover:text-[#111827]">
+        <LanguageToggle className="hidden lg:inline-flex" />
+        <button
+          type="button"
+          aria-label={t('topnav.notifications')}
+          className="flex h-10 w-10 items-center justify-center rounded-2xl text-[#687a92] transition hover:bg-white hover:text-[#111827]"
+        >
           <BellIcon />
         </button>
-        <button className="flex h-10 w-10 items-center justify-center rounded-2xl text-[#687a92] transition hover:bg-white hover:text-[#111827]">
+        <button
+          type="button"
+          aria-label={t('topnav.help')}
+          className="flex h-10 w-10 items-center justify-center rounded-2xl text-[#687a92] transition hover:bg-white hover:text-[#111827]"
+        >
           <QuestionMarkIcon />
         </button>
-        <Link to="/settings" className="flex h-10 w-10 items-center justify-center rounded-2xl text-[#687a92] transition hover:bg-white hover:text-[#111827]">
+        <Link
+          to="/settings"
+          aria-label={t('topnav.settings')}
+          className="flex h-10 w-10 items-center justify-center rounded-2xl text-[#687a92] transition hover:bg-white hover:text-[#111827]"
+        >
           <SettingCogIcon />
         </Link>
       </div>

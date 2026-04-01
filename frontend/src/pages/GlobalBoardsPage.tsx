@@ -4,33 +4,34 @@ import { useQuery } from '@tanstack/react-query';
 import { CreateBoardModal } from '@/components/CreateBoardModal';
 import { Sidebar } from '@/components/Sidebar';
 import { TopNav } from '@/components/TopNav';
+import { useI18n } from '@/context/I18nContext';
 import { boardApi, projectApi } from '@/services/api';
 import type { Board } from '@/types';
 
 type BoardFilter = 'all' | 'linked' | 'standalone';
 
-const filterLabels: Record<BoardFilter, string> = {
-  all: 'All Boards',
-  linked: 'Project Boards',
-  standalone: 'Standalone',
-};
-
-function formatDateLabel(value?: string) {
-  if (!value) return 'Recently updated';
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Recently updated';
-
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-  }).format(date);
-}
-
 export function GlobalBoardsPage() {
+  const { t, formatDate } = useI18n();
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState<BoardFilter>('all');
   const [showCreateBoardModal, setShowCreateBoardModal] = useState(false);
+  const filterLabels: Record<BoardFilter, string> = {
+    all: t('boards.filter.all'),
+    linked: t('boards.filter.linked'),
+    standalone: t('boards.filter.standalone'),
+  };
+
+  const formatDateLabel = (value?: string) => {
+    if (!value) return t('common.justNow');
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return t('common.justNow');
+
+    return formatDate(date, {
+      month: 'short',
+      day: 'numeric',
+    });
+  };
 
   const { data: boardsResponse, isLoading: boardsLoading } = useQuery({
     queryKey: ['boards'],
@@ -75,15 +76,15 @@ export function GlobalBoardsPage() {
       <Sidebar activePage="boards" />
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f7fbff]">
-        <TopNav title="" searchPlaceholder="Search boards..." />
+        <TopNav title="" searchPlaceholder={t('boards.searchPlaceholder')} />
 
         <div className="flex-1 overflow-auto px-10 pb-10 pt-8">
           <div className="mx-auto max-w-[1240px]">
             <div className="mb-10 flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
               <div>
-                <h1 className="text-[38px] font-extrabold tracking-tight text-[#162231]">Boards</h1>
+                <h1 className="text-[38px] font-extrabold tracking-tight text-[#162231]">{t('boards.title')}</h1>
                 <p className="mt-2 text-[17px] font-medium text-[#5b6b80]">
-                  See every board across the workspace, including project-linked delivery boards and standalone spaces.
+                  {t('boards.desc')}
                 </p>
               </div>
 
@@ -111,22 +112,22 @@ export function GlobalBoardsPage() {
                   className="flex h-14 items-center gap-3 rounded-2xl bg-[#0f4fe6] px-7 text-[16px] font-bold text-white shadow-[0_16px_32px_rgba(15,79,230,0.24)]"
                 >
                   <span className="text-[26px] leading-none">+</span>
-                  New Board
+                  {t('boards.newBoard')}
                 </button>
               </div>
             </div>
 
             <div className="mb-8 grid gap-6 md:grid-cols-3">
               <section className="rounded-[30px] bg-[#eef4fa] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-                <p className="text-[13px] font-extrabold tracking-[0.15em] text-[#4e5f74]">TOTAL BOARDS</p>
+                <p className="text-[13px] font-extrabold tracking-[0.15em] text-[#4e5f74]">{t('boards.total')}</p>
                 <p className="mt-4 text-[52px] font-extrabold leading-none tracking-tight text-[#162231]">{stats.total}</p>
               </section>
               <section className="rounded-[30px] bg-[#eef4fa] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-                <p className="text-[13px] font-extrabold tracking-[0.15em] text-[#4e5f74]">LINKED TO PROJECTS</p>
+                <p className="text-[13px] font-extrabold tracking-[0.15em] text-[#4e5f74]">{t('boards.linked')}</p>
                 <p className="mt-4 text-[52px] font-extrabold leading-none tracking-tight text-[#162231]">{stats.linked}</p>
               </section>
               <section className="rounded-[30px] bg-[#eef4fa] p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-                <p className="text-[13px] font-extrabold tracking-[0.15em] text-[#4e5f74]">STANDALONE BOARDS</p>
+                <p className="text-[13px] font-extrabold tracking-[0.15em] text-[#4e5f74]">{t('boards.standalone')}</p>
                 <p className="mt-4 text-[52px] font-extrabold leading-none tracking-tight text-[#162231]">{stats.standalone}</p>
               </section>
             </div>
@@ -144,16 +145,16 @@ export function GlobalBoardsPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                   </svg>
                 </div>
-                <h2 className="mt-6 text-[24px] font-extrabold text-[#162231]">No boards in this view</h2>
+                <h2 className="mt-6 text-[24px] font-extrabold text-[#162231]">{t('boards.emptyTitle')}</h2>
                 <p className="mx-auto mt-3 max-w-[520px] text-[15px] font-medium leading-7 text-[#5b6b80]">
-                  Create a new board, or switch filters to view project-linked and standalone boards separately.
+                  {t('boards.emptyDesc')}
                 </p>
                 <button
                   type="button"
                   onClick={() => setShowCreateBoardModal(true)}
                   className="mt-8 inline-flex items-center gap-3 rounded-2xl bg-[#0f4fe6] px-7 py-4 text-[16px] font-bold text-white shadow-[0_16px_32px_rgba(15,79,230,0.24)]"
                 >
-                  Create Board
+                  {t('boards.createBoard')}
                 </button>
               </div>
             ) : (
@@ -179,7 +180,7 @@ export function GlobalBoardsPage() {
                           </div>
                           <div>
                             <div className="text-[12px] font-extrabold uppercase tracking-[0.14em] text-[#6b7b90]">
-                              {project ? `Project: ${project.title}` : 'Standalone Board'}
+                              {project ? t('boards.projectPrefix', { name: project.title }) : t('common.standaloneBoard')}
                             </div>
                             <h3 className="mt-2 text-[20px] font-extrabold text-[#162231]">{board.title}</h3>
                           </div>
@@ -191,30 +192,30 @@ export function GlobalBoardsPage() {
                               : 'bg-[#eef4fa] text-[#4e5f74]'
                           }`}
                         >
-                          {board.is_public ? 'PUBLIC' : 'PRIVATE'}
+                          {board.is_public ? t('boards.public') : t('boards.private')}
                         </span>
                       </div>
 
                       <p className="mb-8 min-h-[72px] text-[14px] font-medium leading-7 text-[#5b6b80]">
-                        {board.description || 'No board description yet.'}
+                        {board.description || t('boards.noDescription')}
                       </p>
 
                       <div className="mb-6 grid grid-cols-2 gap-4">
                         <div className="rounded-[22px] bg-[#eef4fa] px-5 py-4">
-                          <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#4e5f74]">Lists</div>
+                          <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#4e5f74]">{t('boards.lists')}</div>
                           <div className="mt-3 text-[28px] font-extrabold text-[#162231]">{listCount}</div>
                         </div>
                         <div className="rounded-[22px] bg-[#eef4fa] px-5 py-4">
-                          <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#4e5f74]">Owner</div>
+                          <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#4e5f74]">{t('boards.owner')}</div>
                           <div className="mt-3 text-[16px] font-extrabold text-[#162231]">
-                            {board.owner?.nickname || board.owner?.username || 'Unknown'}
+                            {board.owner?.nickname || board.owner?.username || t('common.unknown')}
                           </div>
                         </div>
                       </div>
 
                       <div className="flex items-center justify-between text-[13px] font-semibold text-[#5b6b80]">
-                        <span>Updated {formatDateLabel(board.updated_at)}</span>
-                        <span>Open Board</span>
+                        <span>{t('boards.updated', { date: formatDateLabel(board.updated_at) })}</span>
+                        <span>{t('boards.openBoard')}</span>
                       </div>
                     </Link>
                   );
@@ -224,10 +225,10 @@ export function GlobalBoardsPage() {
 
             {projects.length === 0 ? (
               <div className="mt-8 rounded-[30px] border border-[#d9e3ef] bg-white px-8 py-6 text-[14px] font-medium text-[#5b6b80] shadow-[0_12px_24px_rgba(16,24,40,0.04)]">
-                No projects exist yet. You can still create standalone boards, or start by creating a
+                {t('boards.noProjectsNotice')}
                 {' '}
                 <Link to="/projects/new" className="font-bold text-[#0f4fe6] hover:underline">
-                  new project
+                  {t('boardList.newProject')}
                 </Link>
                 .
               </div>

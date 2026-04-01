@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useI18n } from '@/context/I18nContext';
 
 interface DatePickerFieldProps {
   value?: string;
@@ -11,8 +12,6 @@ interface DatePickerFieldProps {
   min?: string;
   max?: string;
 }
-
-const weekdayLabels = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
 const sizeClasses = {
   sm: 'min-h-[40px] rounded-xl px-4 text-sm',
@@ -64,13 +63,15 @@ export function DatePickerField({
   value,
   defaultValue,
   onChange,
-  placeholder = 'Pick a date',
+  placeholder,
   size = 'lg',
   className = '',
   min,
   max,
 }: DatePickerFieldProps) {
+  const { locale, t } = useI18n();
   const isControlled = value !== undefined;
+  const resolvedPlaceholder = placeholder || t('datePicker.pickDate');
   const [internalValue, setInternalValue] = useState(defaultValue ?? '');
   const selectedValue = isControlled ? value ?? '' : internalValue;
   const selectedDate = parseDateString(selectedValue);
@@ -86,6 +87,18 @@ export function DatePickerField({
   const panelRef = useRef<HTMLDivElement>(null);
 
   const calendarDays = useMemo(() => buildCalendarDays(visibleMonth), [visibleMonth]);
+  const weekdayLabels = useMemo(
+    () => [
+      t('datePicker.su'),
+      t('datePicker.mo'),
+      t('datePicker.tu'),
+      t('datePicker.we'),
+      t('datePicker.th'),
+      t('datePicker.fr'),
+      t('datePicker.sa'),
+    ],
+    [t]
+  );
 
   const updatePosition = () => {
     const rect = triggerRef.current?.getBoundingClientRect();
@@ -170,7 +183,7 @@ export function DatePickerField({
         aria-expanded={isOpen}
       >
         <span className={selectedValue ? '' : 'text-[#7c8ea5]'}>
-          {selectedValue || placeholder}
+          {selectedValue || resolvedPlaceholder}
         </span>
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#e8f0f9] text-[#5b6b80]">
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -202,7 +215,7 @@ export function DatePickerField({
                   </svg>
                 </button>
                 <div className="text-[15px] font-extrabold text-[#162231]">
-                  {visibleMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' })}
+                  {visibleMonth.toLocaleString(locale, { month: 'long', year: 'numeric' })}
                 </div>
                 <button
                   type="button"
@@ -253,14 +266,14 @@ export function DatePickerField({
                   onClick={() => commitValue(toDateString(new Date()))}
                   className="text-[13px] font-bold text-[#0f4fe6] transition hover:text-[#0b43c1]"
                 >
-                  Today
+                  {t('datePicker.today')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
                   className="rounded-xl bg-[#f3f7fb] px-4 py-2 text-[13px] font-bold text-[#334155] transition hover:bg-[#e8eff7]"
                 >
-                  Close
+                  {t('datePicker.close')}
                 </button>
               </div>
             </div>,
