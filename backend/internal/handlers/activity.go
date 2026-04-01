@@ -1,8 +1,18 @@
 package handlers
 
 import (
+	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"kanban-system/backend/internal/api"
 	"kanban-system/backend/internal/database"
@@ -11,6 +21,22 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+var webhookHTTPClient = &http.Client{
+	Timeout: 10 * time.Second,
+}
+
+type webhookPayload struct {
+	Event       string    `json:"event"`
+	WebhookID   uint      `json:"webhook_id"`
+	BoardID     uint      `json:"board_id"`
+	EntityType  string    `json:"entity_type"`
+	Action      string    `json:"action"`
+	EntityID    uint      `json:"entity_id"`
+	Content     string    `json:"content"`
+	IsTest      bool      `json:"is_test"`
+	TriggeredAt time.Time `json:"triggered_at"`
+}
 
 // GetBoardActivities 获取看板活动日志
 func GetBoardActivities(c *gin.Context) {
@@ -154,15 +180,98 @@ func triggerWebhooks(boardID uint, action string, entityType string, entityID ui
 	database.DB.Where("board_id = ? AND is_active = ?", boardID, true).Find(&webhooks)
 
 	for _, webhook := range webhooks {
-		go sendWebhook(webhook, action, entityType, entityID, content)
+		go func(webhook models.Webhook) {
+			if err := sendWebhook(webhook, action, entityType, entityID, content, false); err != nil {
+				log.Printf("webhook delivery failed for webhook %d: %v", webhook.ID, err)
+			}
+		}(webhook)
 	}
 }
 
 // sendWebhook 发送 Webhook 请求
-func sendWebhook(webhook models.Webhook, action string, entityType string, entityID uint, content string) {
-	// TODO: 实现 HTTP 请求发送
-	// 这里可以使用 http.Client 发送 POST 请求到 webhook.URL
-	// 请求体包含事件详情
+func sendWebhook(webhook models.Webhook, action string, entityType string, entityID uint, content string, force bool) error {
+	eventName := buildWebhookEventName(entityType, action)
+	if !force && !webhookWantsEvent(webhook.Events, eventName) {
+		return nil
+	}
+
+	payload := webhookPayload{
+		Event:       eventName,
+		WebhookID:   webhook.ID,
+		BoardID:     webhook.BoardID,
+		EntityType:  entityType,
+		Action:      action,
+		EntityID:    entityID,
+		Content:     content,
+		IsTest:      force,
+		TriggeredAt: time.Now().UTC(),
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal payload: %w", err)
+	}
+
+	url := strings.TrimSpace(webhook.URL)
+	if url == "" {
+		return fmt.Errorf("webhook URL is empty")
+	}
+
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "kanban-system-webhook/1.0")
+	req.Header.Set("X-Kanban-Event", eventName)
+	req.Header.Set("X-Kanban-Webhook-Id", strconv.FormatUint(uint64(webhook.ID), 10))
+	req.Header.Set("X-Kanban-Board-Id", strconv.FormatUint(uint64(webhook.BoardID), 10))
+
+	if webhook.Secret != "" {
+		req.Header.Set("X-Kanban-Signature-256", buildWebhookSignature(body, webhook.Secret))
+	}
+
+	resp, err := webhookHTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		responseBody, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		if message := strings.TrimSpace(string(responseBody)); message != "" {
+			return fmt.Errorf("received status %d: %s", resp.StatusCode, message)
+		}
+		return fmt.Errorf("received status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+func buildWebhookEventName(entityType string, action string) string {
+	if entityType == "checklist_item" && action == "completed" {
+		return "checklist.completed"
+	}
+
+	return entityType + "." + action
+}
+
+func webhookWantsEvent(eventsJSON string, eventName string) bool {
+	events := parseEvents(eventsJSON)
+	for _, event := range events {
+		if event == eventName {
+			return true
+		}
+	}
+
+	return false
+}
+
+func buildWebhookSignature(body []byte, secret string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(body)
+	return "sha256=" + hex.EncodeToString(mac.Sum(nil))
 }
 
 // checkBoardAccess 检查用户对看板的访问权限

@@ -20,6 +20,8 @@ const memberRoleOptions = [
   { value: 'observer', label: 'Observer', description: 'Can view board progress without making changes.' },
 ];
 
+const webhookEventOptions = ['card.created', 'card.updated', 'card.moved', 'card.completed'] as const;
+
 function getUserDisplayName(user?: User | null) {
   return user?.nickname || user?.username || 'Unknown user';
 }
@@ -46,6 +48,8 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted }: BoardSetting
   const [generalNotice, setGeneralNotice] = useState('');
   const [memberError, setMemberError] = useState('');
   const [memberNotice, setMemberNotice] = useState('');
+  const [automationError, setAutomationError] = useState('');
+  const [automationNotice, setAutomationNotice] = useState('');
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -140,22 +144,66 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted }: BoardSetting
 
   const createWebhookMutation = useMutation({
     mutationFn: (data: { url: string; events: any[] }) => webhookApi.create(boardId, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['board', boardId, 'webhooks'] }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['board', boardId, 'webhooks'] });
+      setAutomationError('');
+      setAutomationNotice('Webhook added.');
+    },
+    onError: (error: any) => {
+      setAutomationNotice('');
+      setAutomationError(error.response?.data?.error || 'Failed to add webhook');
+    },
   });
 
   const deleteWebhookMutation = useMutation({
     mutationFn: (id: number) => webhookApi.delete(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['board', boardId, 'webhooks'] }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['board', boardId, 'webhooks'] });
+      setAutomationError('');
+      setAutomationNotice('Webhook removed.');
+    },
+    onError: (error: any) => {
+      setAutomationNotice('');
+      setAutomationError(error.response?.data?.error || 'Failed to remove webhook');
+    },
+  });
+
+  const testWebhookMutation = useMutation({
+    mutationFn: (id: number) => webhookApi.test(id),
+    onSuccess: (response) => {
+      setAutomationError('');
+      setAutomationNotice(response.data.message || 'Webhook test delivered.');
+    },
+    onError: (error: any) => {
+      setAutomationNotice('');
+      setAutomationError(error.response?.data?.error || 'Failed to test webhook');
+    },
   });
 
   const createRuleMutation = useMutation({
     mutationFn: (data: { from_list_id: number; to_list_id: number }) => transitionRuleApi.create(boardId, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['board', boardId, 'transition-rules'] }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['board', boardId, 'transition-rules'] });
+      setAutomationError('');
+      setAutomationNotice('Transition rule added.');
+    },
+    onError: (error: any) => {
+      setAutomationNotice('');
+      setAutomationError(error.response?.data?.error || 'Failed to add transition rule');
+    },
   });
 
   const deleteRuleMutation = useMutation({
     mutationFn: (id: number) => transitionRuleApi.delete(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['board', boardId, 'transition-rules'] }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['board', boardId, 'transition-rules'] });
+      setAutomationError('');
+      setAutomationNotice('Transition rule removed.');
+    },
+    onError: (error: any) => {
+      setAutomationNotice('');
+      setAutomationError(error.response?.data?.error || 'Failed to remove transition rule');
+    },
   });
 
   const updateBoardMutation = useMutation({
@@ -259,6 +307,8 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted }: BoardSetting
     setInviteRole('member');
     setMemberError('');
     setMemberNotice('');
+    setAutomationError('');
+    setAutomationNotice('');
   }, [boardId]);
 
   const scrollToSection = (id: string) => {
@@ -840,10 +890,23 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted }: BoardSetting
                         
                         <div className="mb-10">
                            <h4 className="text-[11px] font-extrabold text-gray-400 uppercase tracking-widest mb-4">Webhooks</h4>
+
+                           {automationError ? (
+                              <div className="mb-5 rounded-xl border border-[#ffd7d7] bg-[#fff5f5] px-4 py-3 text-sm font-semibold text-[#b42318]">
+                                 {automationError}
+                              </div>
+                           ) : null}
+
+                           {automationNotice ? (
+                              <div className="mb-5 rounded-xl border border-[#d4f0dd] bg-[#edf9f1] px-4 py-3 text-sm font-semibold text-[#027a48]">
+                                 {automationNotice}
+                              </div>
+                           ) : null}
+
                            <div className="bg-[#f8fafc] p-5 rounded-2xl border border-gray-100 space-y-4 mb-6">
                               <input type="url" id="webhook-url" placeholder="https://api.kineticcore.io/webhook" className="w-full bg-white px-4 py-3 border border-gray-200 rounded-xl font-medium text-sm focus:border-[#0d6efd] focus:ring-1 focus:ring-[#0d6efd] outline-none transition-all placeholder-gray-400" />
                               <div className="flex flex-wrap gap-2 text-[12px] font-bold text-gray-600">
-                                 {['card.created', 'card.updated', 'card.moved', 'card.completed'].map((event) => (
+                                 {webhookEventOptions.map((event) => (
                                     <label key={event} className="flex items-center gap-2 bg-white px-3 py-1.5 border border-gray-200 rounded-lg cursor-pointer hover:border-[#0d6efd] transition-colors">
                                        <input type="checkbox" value={event} className="webhook-event rounded border-gray-300 text-[#0d6efd] focus:ring-[#0d6efd]" />
                                        {event}
@@ -854,24 +917,50 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted }: BoardSetting
                                  const urlInput = document.getElementById('webhook-url') as HTMLInputElement;
                                  const checkboxes = document.querySelectorAll('.webhook-event:checked') as NodeListOf<HTMLInputElement>;
                                  const events = Array.from(checkboxes).map(cb => cb.value);
-                                 if (urlInput?.value.trim() && events.length > 0) {
-                                    createWebhookMutation.mutate({ url: urlInput.value.trim(), events });
-                                    urlInput.value = '';
-                                    checkboxes.forEach((cb) => (cb.checked = false));
+                                 if (!urlInput?.value.trim()) {
+                                    setAutomationNotice('');
+                                    setAutomationError('Webhook URL is required.');
+                                    return;
                                  }
+                                 if (events.length === 0) {
+                                    setAutomationNotice('');
+                                    setAutomationError('Select at least one webhook event.');
+                                    return;
+                                 }
+
+                                 createWebhookMutation.mutate({ url: urlInput.value.trim(), events });
+                                 urlInput.value = '';
+                                 checkboxes.forEach((cb) => (cb.checked = false));
                               }} className="px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold shadow-sm hover:bg-black transition-colors w-full sm:w-auto">
-                                 Add Webhook
+                                 {createWebhookMutation.isPending ? 'Adding...' : 'Add Webhook'}
                               </button>
                            </div>
 
                            <div className="space-y-3">
                               {webhooks?.data?.map((webhook: Webhook) => (
-                                 <div key={webhook.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl group hover:shadow-sm">
-                                    <div>
-                                       <div className="font-bold text-gray-800 text-[14px] truncate w-64 md:w-full">{webhook.url}</div>
+                                 <div key={webhook.id} className="flex flex-col gap-3 p-4 bg-white border border-gray-100 rounded-xl group hover:shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="min-w-0">
+                                       <div className="font-bold text-gray-800 text-[14px] truncate">{webhook.url}</div>
                                        <div className="text-[11px] text-gray-400 font-extrabold mt-1 tracking-wide">{webhook.events.join(', ')}</div>
                                     </div>
-                                    <button onClick={() => deleteWebhookMutation.mutate(webhook.id)} className="text-red-500 font-extrabold text-[11px] uppercase tracking-widest bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all">Remove</button>
+                                    <div className="flex items-center gap-2 opacity-100 transition-all sm:opacity-0 sm:group-hover:opacity-100">
+                                       <button
+                                         type="button"
+                                         disabled={testWebhookMutation.isPending}
+                                         onClick={() => testWebhookMutation.mutate(webhook.id)}
+                                         className="px-3 py-1.5 rounded-lg bg-[#eef4ff] text-[#0d6efd] font-extrabold text-[11px] uppercase tracking-widest hover:bg-[#dce8ff] transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                                       >
+                                         {testWebhookMutation.isPending && testWebhookMutation.variables === webhook.id ? 'Testing...' : 'Test'}
+                                       </button>
+                                       <button
+                                         type="button"
+                                         disabled={deleteWebhookMutation.isPending}
+                                         onClick={() => deleteWebhookMutation.mutate(webhook.id)}
+                                         className="text-red-500 font-extrabold text-[11px] uppercase tracking-widest bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                                       >
+                                         Remove
+                                       </button>
+                                    </div>
                                  </div>
                               ))}
                            </div>
@@ -902,12 +991,24 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted }: BoardSetting
                                 ]}
                               />
                               <button onClick={() => {
-                                 if (ruleFromId && ruleToId && ruleFromId !== ruleToId) {
-                                   createRuleMutation.mutate({ from_list_id: Number(ruleFromId), to_list_id: Number(ruleToId) });
-                                   setRuleFromId('');
-                                   setRuleToId('');
+                                 if (!ruleFromId || !ruleToId) {
+                                   setAutomationNotice('');
+                                   setAutomationError('Choose both source and target statuses.');
+                                   return;
                                  }
-                              }} className="px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold w-full sm:w-auto hover:bg-black transition-colors shrink-0">Add Rule</button>
+
+                                 if (ruleFromId === ruleToId) {
+                                   setAutomationNotice('');
+                                   setAutomationError('Source and target statuses must be different.');
+                                   return;
+                                 }
+
+                                 createRuleMutation.mutate({ from_list_id: Number(ruleFromId), to_list_id: Number(ruleToId) });
+                                 setRuleFromId('');
+                                 setRuleToId('');
+                              }} className="px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold w-full sm:w-auto hover:bg-black transition-colors shrink-0">
+                                 {createRuleMutation.isPending ? 'Adding...' : 'Add Rule'}
+                              </button>
                            </div>
                            
                            <div className="space-y-3">

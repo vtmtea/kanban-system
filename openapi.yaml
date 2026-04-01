@@ -1628,6 +1628,28 @@ paths:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
 
+  /webhooks/{id}/test:
+    post:
+      tags:
+        - webhook
+      summary: 发送Webhook测试请求
+      operationId: testWebhook
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 测试发送成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
   # 数据分析接口
   /boards/{id}/analytics/cfd:
     get:

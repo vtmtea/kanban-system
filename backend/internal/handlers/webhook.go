@@ -183,10 +183,12 @@ func TestWebhook(c *gin.Context) {
 		return
 	}
 
-	// 发送测试请求
-	go sendWebhook(webhook, "test", "webhook", webhook.ID, "Webhook test")
+	if err := sendWebhook(webhook, "test", "webhook", webhook.ID, "Webhook test", true); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to deliver test webhook: " + err.Error()})
+		return
+	}
 
-	c.JSON(http.StatusOK, api.MessageResponse{Message: "Test webhook sent"})
+	c.JSON(http.StatusOK, api.MessageResponse{Message: "Test webhook delivered"})
 }
 
 func stringOrEmpty(s *string) string {

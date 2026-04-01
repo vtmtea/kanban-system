@@ -47,6 +47,7 @@ import type {
   CreateTransitionRuleRequest,
   CreateWebhookRequest,
   UpdateWebhookRequest,
+  MessageResponse,
 } from '@/types';
 
 // 动态获取 API 基础路径
@@ -206,6 +207,7 @@ export const webhookApi = {
   create: (boardId: number, data: CreateWebhookRequest) => api.post<Webhook>(`/boards/${boardId}/webhooks`, data),
   update: (id: number, data: UpdateWebhookRequest) => api.put<Webhook>(`/webhooks/${id}`, data),
   delete: (id: number) => api.delete(`/webhooks/${id}`),
+  test: (id: number) => api.post<MessageResponse>(`/webhooks/${id}/test`),
 };
 
 // 状态转移规则相关

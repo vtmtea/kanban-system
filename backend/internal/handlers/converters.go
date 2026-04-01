@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"encoding/json"
+	"strings"
+
 	"kanban-system/backend/internal/api"
 	"kanban-system/backend/internal/models"
 )
@@ -354,7 +357,6 @@ func webhookToAPI(webhook models.Webhook) *api.Webhook {
 
 	// Parse events from JSON string
 	if webhook.Events != "" {
-		// Simple parsing - in production you'd use json.Unmarshal
 		w.Events = parseEvents(webhook.Events)
 	}
 
@@ -363,11 +365,19 @@ func webhookToAPI(webhook models.Webhook) *api.Webhook {
 
 // Helper function to parse events JSON
 func parseEvents(eventsJSON string) []string {
-	// Simple implementation - remove brackets and quotes
-	// In production, use proper JSON parsing
 	if eventsJSON == "" {
 		return []string{}
 	}
-	// This is a simplified version
-	return []string{eventsJSON}
+
+	var events []string
+	if err := json.Unmarshal([]byte(eventsJSON), &events); err == nil {
+		return events
+	}
+
+	var singleEvent string
+	if err := json.Unmarshal([]byte(eventsJSON), &singleEvent); err == nil && singleEvent != "" {
+		return []string{singleEvent}
+	}
+
+	return []string{strings.TrimSpace(eventsJSON)}
 }
