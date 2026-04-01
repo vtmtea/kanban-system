@@ -1,261 +1,597 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useMutation } from '@tanstack/react-query';
 import { Sidebar } from '@/components/Sidebar';
 import { TopNav } from '@/components/TopNav';
 import { SelectField } from '@/components/SelectField';
+import { useAuth } from '@/context/AuthContext';
+import { authApi } from '@/services/api';
+
+const workspaceSettingsStorageKey = 'settings.workspace';
+const notificationSettingsStorageKey = 'settings.notifications';
+
+const timezoneOptions = [
+  { value: 'Asia/Shanghai', label: 'Asia/Shanghai', description: 'Use your local timezone for dates and due reminders.' },
+  { value: 'UTC', label: 'UTC', description: 'Keep timestamps normalized for distributed collaboration.' },
+  { value: 'America/New_York', label: 'America/New_York', description: 'Useful when your team primarily works in EST/EDT.' },
+  { value: 'Europe/Berlin', label: 'Europe/Berlin', description: 'Helpful when collaborating across CET/CEST schedules.' },
+];
+
+const weekStartOptions = [
+  { value: 'monday', label: 'Monday', description: 'Align planning around a Monday-first work week.' },
+  { value: 'sunday', label: 'Sunday', description: 'Use a Sunday-first calendar layout.' },
+];
+
+const densityOptions = [
+  { value: 'comfortable', label: 'Comfortable', description: 'More whitespace for relaxed scanning.' },
+  { value: 'compact', label: 'Compact', description: 'Fit more information on screen at once.' },
+];
+
+const defaultWorkspaceSettings = {
+  timezone:
+    typeof Intl !== 'undefined'
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+      : 'UTC',
+  weekStartsOn: 'monday',
+  density: 'comfortable',
+  compactCards: false,
+  stickBoardFilters: true,
+};
+
+const defaultNotificationSettings = {
+  cardAssignedEmail: true,
+  dueSoonDesktop: true,
+  commentMentionEmail: true,
+  weeklyDigest: false,
+};
+
+function formatDateLabel(value?: string) {
+  if (!value) return 'Unavailable';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Unavailable';
+
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(date);
+}
+
+function Toggle({
+  checked,
+  onChange,
+  disabled = false,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => !disabled && onChange(!checked)}
+      className={`relative inline-flex h-8 w-14 items-center rounded-full transition ${
+        checked ? 'bg-[#0f4fe6]' : 'bg-[#d9e3ec]'
+      } disabled:cursor-not-allowed disabled:opacity-60`}
+    >
+      <span
+        className={`inline-block h-6 w-6 rounded-full bg-white shadow-sm transition-transform ${
+          checked ? 'translate-x-7' : 'translate-x-1'
+        }`}
+      />
+    </button>
+  );
+}
 
 export function SettingsPage() {
+  const { user, token, login, loading } = useAuth();
   const [activeSection, setActiveSection] = useState('profile');
+  const [profileForm, setProfileForm] = useState({ nickname: '', avatar: '' });
+  const [profileSnapshot, setProfileSnapshot] = useState({ nickname: '', avatar: '' });
+  const [workspaceSettings, setWorkspaceSettings] = useState(defaultWorkspaceSettings);
+  const [workspaceSnapshot, setWorkspaceSnapshot] = useState(defaultWorkspaceSettings);
+  const [notificationSettings, setNotificationSettings] = useState(defaultNotificationSettings);
+  const [notificationSnapshot, setNotificationSnapshot] = useState(defaultNotificationSettings);
+  const [profileNotice, setProfileNotice] = useState('');
+  const [profileError, setProfileError] = useState('');
+  const [workspaceNotice, setWorkspaceNotice] = useState('');
+  const [notificationNotice, setNotificationNotice] = useState('');
 
-  // Svg icons for Global Sidebar
-        
   const scrollToSection = (id: string) => {
     setActiveSection(id);
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  useEffect(() => {
+    if (!user) return;
+
+    const nextProfile = {
+      nickname: user.nickname || user.username || '',
+      avatar: user.avatar || '',
+    };
+    setProfileForm(nextProfile);
+    setProfileSnapshot(nextProfile);
+  }, [user]);
+
+  useEffect(() => {
+    try {
+      const storedWorkspace = localStorage.getItem(workspaceSettingsStorageKey);
+      const storedNotifications = localStorage.getItem(notificationSettingsStorageKey);
+
+      if (storedWorkspace) {
+        const parsed = JSON.parse(storedWorkspace);
+        const nextWorkspace = {
+          ...defaultWorkspaceSettings,
+          ...parsed,
+        };
+        setWorkspaceSettings(nextWorkspace);
+        setWorkspaceSnapshot(nextWorkspace);
+      }
+
+      if (storedNotifications) {
+        const parsed = JSON.parse(storedNotifications);
+        const nextNotifications = {
+          ...defaultNotificationSettings,
+          ...parsed,
+        };
+        setNotificationSettings(nextNotifications);
+        setNotificationSnapshot(nextNotifications);
+      }
+    } catch {
+      setWorkspaceSettings(defaultWorkspaceSettings);
+      setWorkspaceSnapshot(defaultWorkspaceSettings);
+      setNotificationSettings(defaultNotificationSettings);
+      setNotificationSnapshot(defaultNotificationSettings);
+    }
+  }, []);
+
+  const profileMutation = useMutation({
+    mutationFn: () =>
+      authApi.updateUser({
+        nickname: profileForm.nickname.trim(),
+        avatar: profileForm.avatar.trim(),
+      }),
+    onSuccess: (response) => {
+      if (token) {
+        login(token, response.data);
+      }
+      const nextProfile = {
+        nickname: response.data.nickname || response.data.username || '',
+        avatar: response.data.avatar || '',
+      };
+      setProfileForm(nextProfile);
+      setProfileSnapshot(nextProfile);
+      setProfileError('');
+      setProfileNotice('Profile details updated.');
+    },
+    onError: (error: any) => {
+      setProfileNotice('');
+      setProfileError(error.response?.data?.error || 'Failed to update profile');
+    },
+  });
+
+  const avatarPreview = profileForm.avatar.trim() || user?.avatar || 'https://i.pravatar.cc/160?img=47';
+
+  const hasProfileChanges = useMemo(
+    () =>
+      profileForm.nickname.trim() !== profileSnapshot.nickname.trim() ||
+      profileForm.avatar.trim() !== profileSnapshot.avatar.trim(),
+    [profileForm, profileSnapshot]
+  );
+
+  const hasWorkspaceChanges = useMemo(
+    () => JSON.stringify(workspaceSettings) !== JSON.stringify(workspaceSnapshot),
+    [workspaceSettings, workspaceSnapshot]
+  );
+
+  const hasNotificationChanges = useMemo(
+    () => JSON.stringify(notificationSettings) !== JSON.stringify(notificationSnapshot),
+    [notificationSettings, notificationSnapshot]
+  );
+
+  if (loading || !user) {
+    return (
+      <div className="flex h-screen bg-[#f8fafc] font-sans antialiased text-gray-800">
+        <Sidebar activePage="settings" />
+        <main className="flex-1 flex items-center justify-center bg-[#fbfcfd]">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#0d6efd] border-t-transparent" />
+            <div className="text-sm font-semibold tracking-wider text-gray-500">LOADING SETTINGS...</div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-[#f8fafc] font-sans antialiased text-gray-800">
-      {/* Global Sidebar */}
       <Sidebar activePage="settings" />
 
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col relative bg-white">
-        
-        {/* Top Navbar */}
-        <TopNav title="Settings" />
+      <main className="flex flex-1 flex-col bg-white">
+        <TopNav title="Settings" searchPlaceholder="Search settings..." />
 
-        {/* Global Settings Split Pane Wrapper */}
         <div className="flex flex-1 overflow-hidden bg-[#fbfcfd]">
-           
-           {/* Secondary Settings Sidebar */}
-           <aside className="w-64 border-r border-gray-100 bg-white shrink-0 p-8 flex flex-col">
-              
-              <nav className="space-y-1">
-                 <button onClick={() => scrollToSection('profile')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-colors text-[14px] font-bold ${activeSection === 'profile' ? 'bg-blue-50 text-[#0d6efd]' : 'text-gray-500 hover:bg-gray-50'}`}>
-                   <svg className="w-5 h-5 opacity-70" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg>
-                   Profile
-                 </button>
-                 <button onClick={() => scrollToSection('workspace')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-colors text-[14px] font-bold ${activeSection === 'workspace' ? 'bg-blue-50 text-[#0d6efd]' : 'text-gray-500 hover:bg-gray-50'}`}>
-                   <svg className="w-5 h-5 opacity-70" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" /></svg>
-                   Workspace
-                 </button>
-                 <button onClick={() => scrollToSection('notifications')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-colors text-[14px] font-bold ${activeSection === 'notifications' ? 'bg-blue-50 text-[#0d6efd]' : 'text-gray-500 hover:bg-gray-50'}`}>
-                   <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-                   Notifications
-                 </button>
-                 <button onClick={() => scrollToSection('team')} className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-colors text-[14px] font-bold ${activeSection === 'team' ? 'bg-blue-50 text-[#0d6efd]' : 'text-gray-500 hover:bg-gray-50'}`}>
-                   <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                   Team
-                 </button>
-              </nav>
+          <aside className="hidden w-72 shrink-0 border-r border-gray-100 bg-white p-8 lg:flex lg:flex-col">
+            <div className="mb-8 rounded-[28px] border border-[#d9e3ef] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4fa_100%)] p-6 shadow-[0_14px_32px_rgba(15,23,42,0.05)]">
+              <div className="flex items-center gap-4">
+                <img
+                  src={avatarPreview}
+                  alt={profileForm.nickname || user.username}
+                  className="h-16 w-16 rounded-[22px] border border-white object-cover shadow-sm"
+                />
+                <div className="min-w-0">
+                  <div className="truncate text-[18px] font-extrabold text-[#162231]">
+                    {profileForm.nickname.trim() || user.username}
+                  </div>
+                  <div className="mt-1 truncate text-[13px] font-medium text-[#5b6b80]">{user.email}</div>
+                </div>
+              </div>
 
-           </aside>
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-white px-4 py-3 shadow-sm">
+                  <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">Username</div>
+                  <div className="mt-2 text-[14px] font-bold text-[#162231]">@{user.username}</div>
+                </div>
+                <div className="rounded-2xl bg-white px-4 py-3 shadow-sm">
+                  <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">Joined</div>
+                  <div className="mt-2 text-[14px] font-bold text-[#162231]">{formatDateLabel(user.created_at)}</div>
+                </div>
+              </div>
+            </div>
 
-           {/* Content Scrolling Area */}
-           <div className="flex-1 overflow-y-auto w-full relative custom-scrollbar">
-              <div className="max-w-[800px] p-12 lg:p-14 space-y-10 pb-40 animate-slide-up-fade stagger-delay-1">
-                 
-                 <div className="mb-2">
-                   <h2 className="text-[28px] font-extrabold text-gray-900 tracking-tight mb-2">Settings</h2>
-                   <p className="text-[14px] text-gray-500 font-medium">Manage your workspace preferences, profile, and team permissions.</p>
-                 </div>
+            <nav className="space-y-2">
+              {[
+                ['profile', 'Profile'],
+                ['workspace', 'Workspace'],
+                ['notifications', 'Notifications'],
+                ['team', 'Administration'],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => scrollToSection(id)}
+                  className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-[14px] font-bold transition ${
+                    activeSection === id
+                      ? 'bg-[#eef4ff] text-[#0f4fe6]'
+                      : 'text-[#5b6b80] hover:bg-[#f4f7fb] hover:text-[#162231]'
+                  }`}
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white shadow-sm">
+                    {label.slice(0, 1)}
+                  </span>
+                  {label}
+                </button>
+              ))}
+            </nav>
+          </aside>
 
-                 {/* Profile Block */}
-                 <section id="profile" className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm scroll-mt-10">
-                    <div className="flex items-center gap-6 mb-8">
-                       <div className="w-20 h-20 rounded-2xl shadow-sm border border-gray-100 overflow-hidden bg-gray-100 shrink-0">
-                          <img src="https://i.pravatar.cc/150?img=47" alt="Avatar" className="w-full h-full object-cover" />
-                       </div>
-                       <div>
-                          <h3 className="text-lg font-extrabold text-gray-900 mb-1">Personal Information</h3>
-                          <p className="text-[13px] text-gray-500 font-medium">Update your photo and personal details.</p>
-                       </div>
+          <div className="flex-1 overflow-y-auto px-6 py-8 md:px-10 lg:px-12">
+            <div className="mx-auto max-w-[920px] space-y-8 pb-20">
+              <div>
+                <h2 className="text-[32px] font-extrabold tracking-tight text-[#162231]">Personal Settings</h2>
+                <p className="mt-2 max-w-2xl text-[15px] font-medium leading-7 text-[#5b6b80]">
+                  Update your profile, keep your browser preferences in sync, and jump to the right place for board administration.
+                </p>
+              </div>
+
+              <section id="profile" className="scroll-mt-10 rounded-[32px] border border-gray-100 bg-white p-8 shadow-sm">
+                <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h3 className="text-[22px] font-extrabold text-[#162231]">Profile</h3>
+                    <p className="mt-2 text-[14px] font-medium text-[#5b6b80]">
+                      Change how you appear across boards, comments, assignments, and activity feeds.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!hasProfileChanges || !profileForm.nickname.trim() || profileMutation.isPending}
+                    onClick={() => profileMutation.mutate()}
+                    className="rounded-2xl bg-[#0f4fe6] px-5 py-3 text-sm font-bold text-white shadow-[0_14px_28px_rgba(15,79,230,0.22)] transition hover:bg-[#0c43c2] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {profileMutation.isPending ? 'Saving...' : 'Save Profile'}
+                  </button>
+                </div>
+
+                {profileError ? (
+                  <div className="mb-5 rounded-2xl border border-[#ffd7d7] bg-[#fff5f5] px-4 py-3 text-sm font-semibold text-[#b42318]">
+                    {profileError}
+                  </div>
+                ) : null}
+
+                {profileNotice ? (
+                  <div className="mb-5 rounded-2xl border border-[#d4f0dd] bg-[#edf9f1] px-4 py-3 text-sm font-semibold text-[#027a48]">
+                    {profileNotice}
+                  </div>
+                ) : null}
+
+                <div className="grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
+                  <div className="rounded-[28px] border border-[#d9e3ef] bg-[linear-gradient(180deg,#f9fbff_0%,#eff4fa_100%)] p-5">
+                    <img
+                      src={avatarPreview}
+                      alt={profileForm.nickname || user.username}
+                      className="h-44 w-full rounded-[24px] object-cover shadow-sm"
+                    />
+                    <div className="mt-5 text-[12px] font-extrabold uppercase tracking-[0.18em] text-[#6b7b90]">
+                      Live Preview
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-6">
-                       <div>
-                          <label className="block text-[11px] font-extrabold text-gray-400 uppercase tracking-widest mb-2">Full Name</label>
-                          <input type="text" defaultValue="Julianna Silva" className="w-full bg-[#ecf0f3]/50 px-4 py-3 rounded-xl border border-transparent focus:border-[#0d6efd] focus:bg-white outline-none font-bold text-[14px] text-gray-800 transition-colors" />
-                       </div>
-                       <div>
-                          <label className="block text-[11px] font-extrabold text-gray-400 uppercase tracking-widest mb-2">Email Address</label>
-                          <input type="email" defaultValue="julianna@kineticcore.io" disabled className="w-full bg-[#ecf0f3]/50 opacity-80 cursor-not-allowed px-4 py-3 rounded-xl border border-transparent font-bold text-[14px] text-gray-800 transition-colors" />
-                       </div>
-                       <div>
-                          <label className="block text-[11px] font-extrabold text-gray-400 uppercase tracking-widest mb-2">Job Title</label>
-                          <input type="text" defaultValue="Principal Product Architect" className="w-full bg-[#ecf0f3]/50 px-4 py-3 rounded-xl border border-transparent focus:border-[#0d6efd] focus:bg-white outline-none font-bold text-[14px] text-gray-800 transition-colors" />
-                       </div>
-                       <div>
-                          <label className="block text-[11px] font-extrabold text-gray-400 uppercase tracking-widest mb-2">Timezone</label>
-                          <SelectField
-                            size="lg"
-                            defaultValue="gmt-05"
-                            options={[
-                              { value: 'gmt-05', label: 'GMT -05:00 Eastern Time' },
-                              { value: 'gmt+01', label: 'GMT +01:00 Central European' },
-                            ]}
-                          />
-                       </div>
+                    <div className="mt-2 text-[18px] font-extrabold text-[#162231]">
+                      {profileForm.nickname.trim() || user.username}
                     </div>
-                 </section>
+                    <div className="mt-1 text-[13px] font-medium text-[#5b6b80]">{user.email}</div>
+                  </div>
 
-                 {/* Workspace Settings Block */}
-                 <section id="workspace" className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm scroll-mt-10">
-                    <div className="mb-8">
-                       <h3 className="text-lg font-extrabold text-gray-900 mb-1">Workspace Settings</h3>
-                       <p className="text-[13px] text-gray-500 font-medium">Configure your shared environment settings.</p>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-6 mb-8">
-                       <div>
-                          <label className="block text-[11px] font-extrabold text-gray-400 uppercase tracking-widest mb-2">Workspace Name</label>
-                          <input type="text" defaultValue="Kinetic Core" className="w-full bg-[#ecf0f3]/50 px-4 py-3 rounded-xl border border-transparent focus:border-[#0d6efd] focus:bg-white outline-none font-bold text-[14px] text-gray-800 transition-colors" />
-                       </div>
-                       <div>
-                          <label className="block text-[11px] font-extrabold text-gray-400 uppercase tracking-widest mb-2">Workspace URL</label>
-                          <div className="flex bg-[#ecf0f3]/50 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-[#0d6efd]/30 transition-shadow">
-                             <span className="px-4 py-3 text-[14px] font-bold text-gray-400 border-r border-[#ecf0f3]">kinetic.io/</span>
-                             <input type="text" defaultValue="core-alpha" className="w-full bg-transparent px-4 py-3 border-transparent outline-none font-bold text-[14px] text-gray-800" />
-                          </div>
-                       </div>
-                    </div>
+                  <div className="grid gap-5 md:grid-cols-2">
+                    <label className="block md:col-span-2">
+                      <span className="mb-3 block text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">Display name</span>
+                      <input
+                        type="text"
+                        value={profileForm.nickname}
+                        onChange={(event) => {
+                          setProfileNotice('');
+                          setProfileError('');
+                          setProfileForm((current) => ({ ...current, nickname: event.target.value }));
+                        }}
+                        className="h-[52px] w-full rounded-2xl border border-[#d9e3ef] bg-[#f8fbff] px-4 py-3 text-[15px] font-semibold text-[#162231] outline-none transition focus:border-[#0f4fe6] focus:bg-white"
+                      />
+                    </label>
 
-                    <div className="bg-[#fbfcfd] border border-gray-100 p-5 rounded-xl flex items-center justify-between mb-8 cursor-pointer hover:bg-gray-50 transition-colors">
-                       <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 bg-blue-50 text-blue-500 flex items-center justify-center rounded-lg">
-                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                          </div>
-                          <div>
-                             <h4 className="font-bold text-[14px] text-gray-900">Public Workspace</h4>
-                             <p className="text-[12px] text-gray-500 font-medium mt-0.5">Allow anyone with the link to request access.</p>
-                          </div>
-                       </div>
-                       {/* Toggle Switch */}
-                       <div className="w-11 h-6 bg-[#0d6efd] rounded-full relative cursor-pointer shadow-inner shrink-0">
-                          <div className="w-4 h-4 rounded-full bg-white absolute right-1 top-1 shadow-sm"></div>
-                       </div>
+                    <label className="block md:col-span-2">
+                      <span className="mb-3 block text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">Avatar URL</span>
+                      <input
+                        type="url"
+                        value={profileForm.avatar}
+                        onChange={(event) => {
+                          setProfileNotice('');
+                          setProfileError('');
+                          setProfileForm((current) => ({ ...current, avatar: event.target.value }));
+                        }}
+                        placeholder="https://example.com/avatar.png"
+                        className="h-[52px] w-full rounded-2xl border border-[#d9e3ef] bg-[#f8fbff] px-4 py-3 text-[15px] font-semibold text-[#162231] outline-none transition focus:border-[#0f4fe6] focus:bg-white"
+                      />
+                    </label>
+
+                    <div>
+                      <div className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">Username</div>
+                      <div className="rounded-2xl border border-gray-100 bg-[#f8fafc] px-4 py-3 text-[15px] font-bold text-[#162231]">
+                        @{user.username}
+                      </div>
                     </div>
 
                     <div>
-                       <label className="block text-[11px] font-extrabold text-gray-400 uppercase tracking-widest mb-3">Workspace Logo</label>
-                       <div className="flex items-center gap-4">
-                          <div className="w-16 h-16 bg-[#ecf0f3]/50 border border-gray-200 border-dashed rounded-xl flex flex-col items-center justify-center text-gray-400">
-                             <svg className="w-5 h-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                          </div>
-                          <button className="px-4 py-2 border border-gray-200 text-gray-700 font-bold text-sm bg-white hover:bg-gray-50 rounded-lg shadow-sm">Replace Logo</button>
-                       </div>
+                      <div className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">Email</div>
+                      <div className="rounded-2xl border border-gray-100 bg-[#f8fafc] px-4 py-3 text-[15px] font-bold text-[#162231]">
+                        {user.email}
+                      </div>
                     </div>
-                 </section>
+                  </div>
+                </div>
+              </section>
 
-                 {/* Notifications Block */}
-                 <section id="notifications" className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm scroll-mt-10">
-                    <div className="mb-8">
-                       <h3 className="text-lg font-extrabold text-gray-900 mb-1">Notification Preferences</h3>
-                       <p className="text-[13px] text-gray-500 font-medium">Decide how and when you want to be notified.</p>
+              <section id="workspace" className="scroll-mt-10 rounded-[32px] border border-gray-100 bg-white p-8 shadow-sm">
+                <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h3 className="text-[22px] font-extrabold text-[#162231]">Workspace Preferences</h3>
+                    <p className="mt-2 text-[14px] font-medium text-[#5b6b80]">
+                      These preferences are stored in this browser so your board experience feels consistent on this device.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!hasWorkspaceChanges}
+                    onClick={() => {
+                      localStorage.setItem(workspaceSettingsStorageKey, JSON.stringify(workspaceSettings));
+                      setWorkspaceSnapshot(workspaceSettings);
+                      setWorkspaceNotice('Workspace preferences saved on this device.');
+                    }}
+                    className="rounded-2xl border border-[#d9e3ef] bg-white px-5 py-3 text-sm font-bold text-[#162231] shadow-sm transition hover:border-[#bfd0e2] hover:bg-[#f8fbff] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Save Preferences
+                  </button>
+                </div>
+
+                {workspaceNotice ? (
+                  <div className="mb-5 rounded-2xl border border-[#d4f0dd] bg-[#edf9f1] px-4 py-3 text-sm font-semibold text-[#027a48]">
+                    {workspaceNotice}
+                  </div>
+                ) : null}
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div>
+                    <div className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">Timezone</div>
+                    <SelectField
+                      size="lg"
+                      value={workspaceSettings.timezone}
+                      onChange={(value) => {
+                        setWorkspaceNotice('');
+                        setWorkspaceSettings((current) => ({ ...current, timezone: value }));
+                      }}
+                      options={timezoneOptions}
+                    />
+                  </div>
+
+                  <div>
+                    <div className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">Week starts on</div>
+                    <SelectField
+                      size="lg"
+                      value={workspaceSettings.weekStartsOn}
+                      onChange={(value) => {
+                        setWorkspaceNotice('');
+                        setWorkspaceSettings((current) => ({ ...current, weekStartsOn: value }));
+                      }}
+                      options={weekStartOptions}
+                    />
+                  </div>
+
+                  <div>
+                    <div className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">Content density</div>
+                    <SelectField
+                      size="lg"
+                      value={workspaceSettings.density}
+                      onChange={(value) => {
+                        setWorkspaceNotice('');
+                        setWorkspaceSettings((current) => ({ ...current, density: value }));
+                      }}
+                      options={densityOptions}
+                    />
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between rounded-[24px] border border-[#d9e3ef] bg-[#f8fbff] px-5 py-4">
+                      <div>
+                        <div className="text-[15px] font-bold text-[#162231]">Compact cards</div>
+                        <div className="mt-1 text-[13px] font-medium text-[#5b6b80]">Reduce vertical spacing in board lanes.</div>
+                      </div>
+                      <Toggle
+                        checked={workspaceSettings.compactCards}
+                        onChange={(next) => {
+                          setWorkspaceNotice('');
+                          setWorkspaceSettings((current) => ({ ...current, compactCards: next }));
+                        }}
+                      />
                     </div>
 
-                    <table className="w-full text-left">
-                       <thead>
-                          <tr className="border-b border-gray-100">
-                             <th className="pb-4 text-[11px] font-extrabold text-gray-400 uppercase tracking-widest w-[50%]">Event</th>
-                             <th className="pb-4 text-[11px] font-extrabold text-gray-400 uppercase tracking-widest text-center">Email</th>
-                             <th className="pb-4 text-[11px] font-extrabold text-gray-400 uppercase tracking-widest text-center">Desktop</th>
-                             <th className="pb-4 text-[11px] font-extrabold text-gray-400 uppercase tracking-widest text-center">Slack</th>
-                          </tr>
-                       </thead>
-                       <tbody className="text-[14px] font-bold text-gray-800">
-                          <tr className="border-b border-gray-50">
-                             <td className="py-5">New Task Created</td>
-                             <td className="text-center py-5"><input type="checkbox" defaultChecked className="w-4 h-4 text-[#0d6efd] rounded cursor-pointer" /></td>
-                             <td className="text-center py-5"><input type="checkbox" defaultChecked className="w-4 h-4 text-[#0d6efd] rounded cursor-pointer" /></td>
-                             <td className="text-center py-5"><input type="checkbox" className="w-4 h-4 text-[#0d6efd] rounded cursor-pointer" /></td>
-                          </tr>
-                          <tr className="border-b border-gray-50">
-                             <td className="py-5">Task Completed</td>
-                             <td className="text-center py-5"><input type="checkbox" defaultChecked className="w-4 h-4 text-[#0d6efd] rounded cursor-pointer" /></td>
-                             <td className="text-center py-5"><input type="checkbox" className="w-4 h-4 text-[#0d6efd] rounded cursor-pointer" /></td>
-                             <td className="text-center py-5"><input type="checkbox" defaultChecked className="w-4 h-4 text-[#0d6efd] rounded cursor-pointer" /></td>
-                          </tr>
-                          <tr>
-                             <td className="py-5">Mentioned in Comment</td>
-                             <td className="text-center py-5"><input type="checkbox" defaultChecked className="w-4 h-4 text-[#0d6efd] rounded cursor-pointer" /></td>
-                             <td className="text-center py-5"><input type="checkbox" defaultChecked className="w-4 h-4 text-[#0d6efd] rounded cursor-pointer" /></td>
-                             <td className="text-center py-5"><input type="checkbox" defaultChecked className="w-4 h-4 text-[#0d6efd] rounded cursor-pointer" /></td>
-                          </tr>
-                       </tbody>
-                    </table>
-                 </section>
-
-                 {/* Team Management Block */}
-                 <section id="team" className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm scroll-mt-10">
-                    <div className="flex items-center justify-between mb-8">
-                       <div>
-                          <h3 className="text-lg font-extrabold text-gray-900 mb-1">Team Management</h3>
-                          <p className="text-[13px] text-gray-500 font-medium">Invite and manage roles for your workspace members.</p>
-                       </div>
-                       <button className="px-5 py-2.5 bg-[#0d6efd] text-white rounded-xl text-sm font-bold shadow-md hover:bg-blue-700 active:scale-95 transition-all flex items-center gap-2">
-                         <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7h-1v-1h1V5h1v1h1v1h-1v1h-1V7z" /></svg>
-                         Invite Member
-                       </button>
+                    <div className="flex items-center justify-between rounded-[24px] border border-[#d9e3ef] bg-[#f8fbff] px-5 py-4">
+                      <div>
+                        <div className="text-[15px] font-bold text-[#162231]">Sticky board filters</div>
+                        <div className="mt-1 text-[13px] font-medium text-[#5b6b80]">Keep your last board filters remembered locally.</div>
+                      </div>
+                      <Toggle
+                        checked={workspaceSettings.stickBoardFilters}
+                        onChange={(next) => {
+                          setWorkspaceNotice('');
+                          setWorkspaceSettings((current) => ({ ...current, stickBoardFilters: next }));
+                        }}
+                      />
                     </div>
+                  </div>
+                </div>
+              </section>
 
-                    <div className="space-y-2">
-                       {/* Mock Users mimicking the design exactly */}
-                       <div className="flex items-center justify-between p-4 bg-[#fbfcfd] border border-gray-100 rounded-xl">
-                          <div className="flex items-center gap-4">
-                             <div className="w-10 h-10 rounded-full bg-blue-100 text-[#0d6efd] flex items-center justify-center font-bold text-sm">JS</div>
-                             <div>
-                                <div className="font-extrabold text-[14px] text-gray-900">Julianna Silva <span className="text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded ml-1 uppercase">You</span></div>
-                                <div className="text-[12px] font-medium text-gray-400">julianna@kineticcore.io</div>
-                             </div>
-                          </div>
-                          <div className="flex items-center gap-4">
-                             <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-[10px] font-extrabold tracking-widest uppercase">Admin</span>
-                             <button className="text-gray-400 hover:text-gray-900"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg></button>
-                          </div>
-                       </div>
+              <section id="notifications" className="scroll-mt-10 rounded-[32px] border border-gray-100 bg-white p-8 shadow-sm">
+                <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h3 className="text-[22px] font-extrabold text-[#162231]">Notifications</h3>
+                    <p className="mt-2 text-[14px] font-medium text-[#5b6b80]">
+                      Tune reminder defaults for this browser so you can stay focused without losing important updates.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!hasNotificationChanges}
+                    onClick={() => {
+                      localStorage.setItem(notificationSettingsStorageKey, JSON.stringify(notificationSettings));
+                      setNotificationSnapshot(notificationSettings);
+                      setNotificationNotice('Notification preferences saved on this device.');
+                    }}
+                    className="rounded-2xl border border-[#d9e3ef] bg-white px-5 py-3 text-sm font-bold text-[#162231] shadow-sm transition hover:border-[#bfd0e2] hover:bg-[#f8fbff] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Save Notifications
+                  </button>
+                </div>
 
-                       <div className="flex items-center justify-between p-4 border border-transparent hover:bg-gray-50 rounded-xl transition-colors">
-                          <div className="flex items-center gap-4">
-                             <div className="w-10 h-10 rounded-full bg-gray-100 overflow-hidden"><img src="https://i.pravatar.cc/150?img=11" alt="ava" className="w-full h-full object-cover"/></div>
-                             <div>
-                                <div className="font-extrabold text-[14px] text-gray-900">Alex Mason</div>
-                                <div className="text-[12px] font-medium text-gray-400">alex.m@kineticcore.io</div>
-                             </div>
-                          </div>
-                          <div className="flex items-center gap-4">
-                             <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-[10px] font-extrabold tracking-widest uppercase">Member</span>
-                             <button className="text-gray-400 hover:text-gray-900"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg></button>
-                          </div>
-                       </div>
+                {notificationNotice ? (
+                  <div className="mb-5 rounded-2xl border border-[#d4f0dd] bg-[#edf9f1] px-4 py-3 text-sm font-semibold text-[#027a48]">
+                    {notificationNotice}
+                  </div>
+                ) : null}
 
-                       <div className="flex items-center justify-between p-4 border border-transparent hover:bg-gray-50 rounded-xl transition-colors">
-                          <div className="flex items-center gap-4">
-                             <div className="w-10 h-10 rounded-full bg-gray-100 overflow-hidden"><img src="https://i.pravatar.cc/150?img=33" alt="ava" className="w-full h-full object-cover"/></div>
-                             <div>
-                                <div className="font-extrabold text-[14px] text-gray-900">Lia Wong</div>
-                                <div className="text-[12px] font-medium text-gray-400">lia@kineticcore.io</div>
-                             </div>
-                          </div>
-                          <div className="flex items-center gap-4">
-                             <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-[10px] font-extrabold tracking-widest uppercase">Viewer</span>
-                             <button className="text-gray-400 hover:text-gray-900"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg></button>
-                          </div>
-                       </div>
+                <div className="space-y-4">
+                  {[
+                    {
+                      key: 'cardAssignedEmail',
+                      title: 'Email when a card is assigned to me',
+                      description: 'Useful when teammates hand work over and you are not already looking at the board.',
+                    },
+                    {
+                      key: 'dueSoonDesktop',
+                      title: 'Desktop reminder for cards due soon',
+                      description: 'Surface upcoming due dates before they turn urgent.',
+                    },
+                    {
+                      key: 'commentMentionEmail',
+                      title: 'Email when I am mentioned in a comment',
+                      description: 'Catch feedback and unblock conversations faster.',
+                    },
+                    {
+                      key: 'weeklyDigest',
+                      title: 'Weekly delivery digest',
+                      description: 'Summarize your board momentum once per week on this device.',
+                    },
+                  ].map((item) => (
+                    <div
+                      key={item.key}
+                      className="flex items-center justify-between rounded-[24px] border border-[#d9e3ef] bg-[#f8fbff] px-5 py-4"
+                    >
+                      <div className="pr-4">
+                        <div className="text-[15px] font-bold text-[#162231]">{item.title}</div>
+                        <div className="mt-1 text-[13px] font-medium text-[#5b6b80]">{item.description}</div>
+                      </div>
+                      <Toggle
+                        checked={notificationSettings[item.key as keyof typeof notificationSettings]}
+                        onChange={(next) => {
+                          setNotificationNotice('');
+                          setNotificationSettings((current) => ({
+                            ...current,
+                            [item.key]: next,
+                          }));
+                        }}
+                      />
                     </div>
-                 </section>
+                  ))}
+                </div>
+              </section>
 
-              </div>
+              <section id="team" className="scroll-mt-10 rounded-[32px] border border-gray-100 bg-white p-8 shadow-sm">
+                <div className="mb-8">
+                  <h3 className="text-[22px] font-extrabold text-[#162231]">Administration</h3>
+                  <p className="mt-2 text-[14px] font-medium text-[#5b6b80]">
+                    Workspace-wide team management is still evolving. Today, the most important admin actions live directly inside each board.
+                  </p>
+                </div>
 
-              {/* Fixed Bottom Save Bar */}
-              <div className="fixed bottom-0 right-0 left-64 lg:left-[512px] p-6 bg-gradient-to-t from-[#fbfcfd] via-[#fbfcfd] to-transparent pt-12 flex justify-end gap-3 z-30 pointer-events-none">
-                 <div className="pointer-events-auto flex items-center gap-4 px-6 py-4">
-                    <button className="text-[13px] font-bold text-gray-600 hover:text-gray-900 mr-2">Discard Changes</button>
-                    <button className="px-6 py-2.5 bg-[#0d6efd] text-white rounded-xl font-bold shadow-md hover:bg-blue-700 active:scale-95 transition-all text-sm">Save Preferences</button>
-                 </div>
-              </div>
-           </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <Link
+                    to="/boards"
+                    className="rounded-[24px] border border-[#d9e3ef] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4fa_100%)] p-5 shadow-sm transition hover:-translate-y-0.5"
+                  >
+                    <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#6b7b90]">Boards</div>
+                    <div className="mt-3 text-[18px] font-extrabold text-[#162231]">Open Board Settings</div>
+                    <div className="mt-2 text-[13px] font-medium leading-6 text-[#5b6b80]">
+                      Manage members, lists, swimlanes, labels, webhooks, and automation rules where the work happens.
+                    </div>
+                  </Link>
 
+                  <Link
+                    to="/projects"
+                    className="rounded-[24px] border border-[#d9e3ef] bg-[linear-gradient(180deg,#fffdf8_0%,#f7f2e8_100%)] p-5 shadow-sm transition hover:-translate-y-0.5"
+                  >
+                    <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#7d6642]">Projects</div>
+                    <div className="mt-3 text-[18px] font-extrabold text-[#162231]">Review Project Health</div>
+                    <div className="mt-2 text-[13px] font-medium leading-6 text-[#5b6b80]">
+                      Track scope, schedule, and status changes across delivery workstreams.
+                    </div>
+                  </Link>
+
+                  <Link
+                    to="/analytics"
+                    className="rounded-[24px] border border-[#d9e3ef] bg-[linear-gradient(180deg,#f8fffb_0%,#edf7f1_100%)] p-5 shadow-sm transition hover:-translate-y-0.5"
+                  >
+                    <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#2e6d57]">Analytics</div>
+                    <div className="mt-3 text-[18px] font-extrabold text-[#162231]">Inspect Flow Metrics</div>
+                    <div className="mt-2 text-[13px] font-medium leading-6 text-[#5b6b80]">
+                      Use cycle time, throughput, and CFD trends to spot blockers and rebalance the system.
+                    </div>
+                  </Link>
+                </div>
+
+                <div className="mt-6 rounded-[24px] border border-dashed border-[#d9e3ef] bg-[#f8fbff] px-5 py-4 text-[14px] font-medium leading-7 text-[#5b6b80]">
+                  Need to adjust board permissions right now? Open a board, click <span className="font-extrabold text-[#162231]">Settings</span>, then use the members and automations sections there.
+                </div>
+              </section>
+            </div>
+          </div>
         </div>
       </main>
     </div>
