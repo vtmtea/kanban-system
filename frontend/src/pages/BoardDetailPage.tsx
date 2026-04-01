@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { boardApi, listApi, cardApi, projectApi } from '@/services/api';
+import { boardApi, listApi, cardApi, projectApi, resolveAssetUrl } from '@/services/api';
 import { CardDetailModal } from '@/components/CardDetailModal';
 import { BoardSettingsModal } from '@/components/BoardSettingsModal';
 import { ActivitySidebar } from '@/components/ActivitySidebar';
@@ -396,7 +396,7 @@ export function BoardDetailPage() {
                       {member.user?.avatar ? (
                         <img
                           className="w-8 h-8 rounded-full border-2 border-white object-cover"
-                          src={member.user.avatar}
+                          src={resolveAssetUrl(member.user.avatar)}
                           alt={member.user.nickname || member.user.username || 'Member'}
                         />
                       ) : (
@@ -620,7 +620,7 @@ export function BoardDetailPage() {
                                             card.assignee.avatar ? (
                                               <img
                                                 className="h-8 w-8 rounded-full border border-white object-cover shadow-sm"
-                                                src={card.assignee.avatar}
+                                                src={resolveAssetUrl(card.assignee.avatar)}
                                                 alt={assigneeName}
                                                 title={assigneeName}
                                               />

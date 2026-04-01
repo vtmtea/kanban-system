@@ -5,7 +5,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { TopNav } from '@/components/TopNav';
 import { SelectField } from '@/components/SelectField';
 import { useAuth } from '@/context/AuthContext';
-import { authApi } from '@/services/api';
+import { authApi, resolveAssetUrl } from '@/services/api';
 
 const workspaceSettingsStorageKey = 'settings.workspace';
 const notificationSettingsStorageKey = 'settings.notifications';
@@ -172,7 +172,8 @@ export function SettingsPage() {
     },
   });
 
-  const avatarPreview = profileForm.avatar.trim() || user?.avatar || 'https://i.pravatar.cc/160?img=47';
+  const avatarPreview =
+    resolveAssetUrl(profileForm.avatar.trim() || user?.avatar) || 'https://i.pravatar.cc/160?img=47';
 
   const hasProfileChanges = useMemo(
     () =>

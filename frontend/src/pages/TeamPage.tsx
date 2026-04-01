@@ -5,7 +5,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { TopNav } from '@/components/TopNav';
 import { SelectField } from '@/components/SelectField';
 import { useAuth } from '@/context/AuthContext';
-import { boardApi, userApi } from '@/services/api';
+import { boardApi, resolveAssetUrl, userApi } from '@/services/api';
 import type { BoardMember, User } from '@/types';
 
 type ManageableRole = 'admin' | 'member' | 'observer';
@@ -46,7 +46,7 @@ function getUserDisplayName(user?: User | null) {
 }
 
 function getUserAvatar(user?: User | null) {
-  return user?.avatar || `https://i.pravatar.cc/160?u=${user?.id || 'guest'}`;
+  return resolveAssetUrl(user?.avatar) || `https://i.pravatar.cc/160?u=${user?.id || 'guest'}`;
 }
 
 function getRoleRank(role: BoardMember['role']) {

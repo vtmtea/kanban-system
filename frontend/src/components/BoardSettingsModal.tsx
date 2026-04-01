@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
-import { boardApi, projectApi, swimlaneApi, webhookApi, transitionRuleApi, labelApi, userApi, listApi } from '@/services/api';
+import { boardApi, projectApi, resolveAssetUrl, swimlaneApi, webhookApi, transitionRuleApi, labelApi, userApi, listApi } from '@/services/api';
 import { AnalyticsDashboard } from '@/components/AnalyticsDashboard';
 import { SelectField } from '@/components/SelectField';
 import { useAuth } from '@/context/AuthContext';
@@ -688,7 +688,7 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
     scrollToSection('team');
   };
 
-  const defaultAva = user?.avatar || 'https://i.pravatar.cc/150?u=board-settings-user';
+  const defaultAva = resolveAssetUrl(user?.avatar) || 'https://i.pravatar.cc/150?u=board-settings-user';
 
   return (
     <div className="fixed inset-0 z-[150] bg-[#fbfcfd] flex flex-col font-sans animate-slide-up-fade">
@@ -1053,7 +1053,7 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
                                     <div className="flex items-center gap-4">
                                       {candidate.avatar ? (
                                         <img
-                                          src={candidate.avatar}
+                                          src={resolveAssetUrl(candidate.avatar)}
                                           alt={getUserDisplayName(candidate)}
                                           className="h-11 w-11 rounded-xl object-cover shadow-sm"
                                         />
@@ -1099,7 +1099,7 @@ export function BoardSettingsModal({ boardId, onClose, onDeleted, onLeftBoard }:
                                   <div className="flex items-center gap-4">
                                      {member.user?.avatar ? (
                                        <img
-                                         src={member.user.avatar}
+                                         src={resolveAssetUrl(member.user.avatar)}
                                          alt={name}
                                          className="h-11 w-11 rounded-xl object-cover shadow-sm"
                                        />

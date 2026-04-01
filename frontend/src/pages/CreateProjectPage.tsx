@@ -5,7 +5,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { TopNav } from '@/components/TopNav';
 import { SelectField } from '@/components/SelectField';
 import { DatePickerField } from '@/components/DatePickerField';
-import { projectApi } from '@/services/api';
+import { projectApi, resolveAssetUrl } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 
 const templates = [
@@ -48,7 +48,7 @@ export function CreateProjectPage() {
   const selectedTemplate = templates.find((template) => template.id === templateId) || templates[0];
   const ownerName = user?.nickname || user?.username || 'Current User';
   const ownerEmail = user?.email || 'workspace@kinetic.io';
-  const ownerAvatar = user?.avatar || `https://i.pravatar.cc/160?u=${user?.id || 'owner'}`;
+  const ownerAvatar = resolveAssetUrl(user?.avatar) || `https://i.pravatar.cc/160?u=${user?.id || 'owner'}`;
   const setupChecklist = useMemo(
     () => [
       { label: 'Add a project name', completed: !!title.trim() },

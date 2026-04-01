@@ -60,6 +60,33 @@ export interface BoardOnlineUsersResponse {
 // 生产环境: 由环境变量 VITE_API_BASE_URL 配置
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
+function getApiRootUrl() {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    return new URL(API_BASE_URL, window.location.origin);
+  } catch {
+    return null;
+  }
+}
+
+export function resolveAssetUrl(value?: string | null) {
+  if (!value) return '';
+
+  if (/^(https?:)?\/\//i.test(value) || value.startsWith('data:') || value.startsWith('blob:')) {
+    return value;
+  }
+
+  const apiRootUrl = getApiRootUrl();
+  if (!apiRootUrl) return value;
+
+  try {
+    return new URL(value, apiRootUrl).toString();
+  } catch {
+    return value;
+  }
+}
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,

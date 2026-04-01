@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { boardApi, projectApi } from '@/services/api';
+import { boardApi, projectApi, resolveAssetUrl } from '@/services/api';
 import { Sidebar } from '@/components/Sidebar';
 import { TopNav } from '@/components/TopNav';
 import { useAuth } from '@/context/AuthContext';
@@ -316,7 +316,7 @@ export function DashboardPage() {
                                 member.user?.avatar ? (
                                   <img
                                     key={member.id}
-                                    src={member.user.avatar}
+                                    src={resolveAssetUrl(member.user.avatar)}
                                     alt={member.user.nickname || member.user.username || 'Member'}
                                     className="h-9 w-9 rounded-full border-2 border-white object-cover"
                                   />

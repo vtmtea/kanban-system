@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { resolveAssetUrl } from '@/services/api';
 
 // Icons
 export const DashboardIcon = () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>;
@@ -30,7 +31,7 @@ export function Sidebar({ activePage }: { activePage: string }) {
 
   const displayName = user?.nickname || user?.username || 'Alex Chen';
   const displayRole = user?.email || 'Team Lead';
-  const avatarUrl = user?.avatar || 'https://i.pravatar.cc/150?img=11';
+  const avatarUrl = resolveAssetUrl(user?.avatar) || 'https://i.pravatar.cc/150?img=11';
 
   return (
     <aside className="hidden h-screen w-[320px] shrink-0 flex-col border-r border-[#d9e3ef] bg-[#f3f7fc] md:flex">
